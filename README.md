@@ -3,7 +3,33 @@
 **DialogSmith** lets you fine-tune large language models (LLMs) like Qwen on your own Telegram conversations.
 Built on top of [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), it automatically formats data into the ShareGPT format for supervised fine-tuning (SFT).
 
----
+## Purpose
+
+Fine-tuning on Telegram data can capture aspects of your text style, including:
+
+* Writing tone, vocabulary, and phrasing
+* Typical response lengths and structure
+* Repeated expressions or idioms
+* Conversational flow and habits
+
+However, this method **won’t replicate your deeper beliefs, private memories, or behavior outside the chat**. It reflects how you write — not necessarily how you think.
+
+For stronger emulation, consider incorporating:
+
+* Additional sources like emails or forum posts
+* Clear prompt instructions during inference
+* Domain-specific datasets (e.g., technical messages, inside jokes)
+
+## Warning: Risk of Sensitive Data Exposure
+
+Fine-tuning on real chat history may unintentionally encode:
+
+* Personal identifiers (names, locations, contact info)
+* Confidential conversations
+* Sensitive or offensive content
+
+> **Always review and sanitize your exported dataset (`result.json`) before training.**
+> You are responsible for ensuring compliance with privacy laws and personal data protection.
 
 ## Export Telegram Chat
 
