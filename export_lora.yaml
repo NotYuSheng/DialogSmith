@@ -1,0 +1,8 @@
+model_name_or_path: Qwen/Qwen1.5-1.8B-Chat
+adapter_name_or_path: saves/Qwen1.5-1.8B-Chat-lora
+template: qwen
+finetuning_type: lora
+export_dir: merged/Qwen1.5-1.8B-Chat-merged
+export_size: 2
+export_device: cpu
+export_legacy_format: false
