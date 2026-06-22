@@ -31,6 +31,19 @@ Fine-tuning on real chat history may unintentionally encode:
 > **Always review and sanitize your exported dataset (`result.json`) before training.**
 > You are responsible for ensuring compliance with privacy laws and personal data protection.
 
+### Keeping your data out of git
+
+Your Telegram export and any generated datasets are ignored by `.gitignore`
+(`result.json`, `*.jsonl`, `DataExport*/`, `*.session`, `.env`, etc.). As an
+extra safeguard, a pre-commit hook refuses to commit these files even if they
+are force-added. Enable it once per clone:
+
+```bash
+git config core.hooksPath hooks
+```
+
+To deliberately commit a blocked file, bypass the hook with `git commit --no-verify`.
+
 ## Export Telegram Chat
 
 1. Open **Telegram Desktop**.

@@ -4,3 +4,10 @@
 /saves
 /LLaMA-Factory
 /merged
+DataExport*/
+ChatExport*/
+
+# Telegram API auth / secrets — never commit
+*.session
+*.session-journal
+.env
