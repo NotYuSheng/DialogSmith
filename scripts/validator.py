@@ -16,6 +16,7 @@ A summary of filtered samples is printed so the user can audit decisions.
 
 import json
 import os
+import re
 
 VALIDATE_ENV = "DIALOGSMITH_LLM_VALIDATE"
 MODEL_ENV = "DIALOGSMITH_LLM_MODEL"
@@ -88,7 +89,11 @@ Conversation:
     )
 
     raw = response.content[0].text.strip()
-    result = json.loads(raw)
+    # The model may wrap the JSON in markdown fences or prose; extract the object.
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        raise ValueError(f"No JSON object found in LLM response: {raw!r}")
+    result = json.loads(match.group())
     return float(result["coherence"]), float(result["quality"]), result.get("reason", "")
 
 
