@@ -11,3 +11,10 @@ ChatExport*/
 *.session
 *.session-journal
 .env
+
+# Telegram media / contacts — never commit (also covered inside DataExport*/)
+*.vcard
+*.tgs
+*.webp
+*.ogg
+*.oga

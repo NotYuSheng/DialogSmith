@@ -5,14 +5,14 @@
 set -euo pipefail
 
 # Patterns that must never be committed (regex, matched against staged paths)
-BLOCK='(^|/)(result\.json|chat_dataset\.jsonl|chat_sharegpt\.json)$|\.session(-journal)?$|(^|/)(DataExport|ChatExport)|(^|/)\.env$'
+BLOCK='(^|/)(result\.json|chat_dataset\.jsonl|chat_sharegpt\.json)$|\.session(-journal)?$|(^|/)(DataExport|ChatExport)|(^|/)\.env$|\.(vcard|tgs|webp|ogg|oga)$'
 
 staged=$(git diff --cached --name-only --diff-filter=AM)
 offenders=$(printf '%s\n' "$staged" | grep -E "$BLOCK" || true)
 
 if [ -n "$offenders" ]; then
   echo "ERROR: refusing to commit Telegram data / secret files:" >&2
-  printf '  - %s\n' $offenders >&2
+  printf '%s\n' "$offenders" | sed 's/^/  - /' >&2
   echo "" >&2
   echo "These contain private chat data or auth tokens. If this is truly" >&2
   echo "intentional, bypass with: git commit --no-verify" >&2

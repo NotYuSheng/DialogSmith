@@ -34,9 +34,11 @@ Fine-tuning on real chat history may unintentionally encode:
 ### Keeping your data out of git
 
 Your Telegram export and any generated datasets are ignored by `.gitignore`
-(`result.json`, `*.jsonl`, `DataExport*/`, `*.session`, `.env`, etc.). As an
-extra safeguard, a pre-commit hook refuses to commit these files even if they
-are force-added. Enable it once per clone:
+(`result.json`, `*.jsonl`, `DataExport*/`, `*.session`, `.env`, plus Telegram
+media/contacts such as `*.vcard`, `*.tgs`, `*.webp`, `*.ogg`/`*.oga`). Generic
+media (`.jpg`, `.mp4`, …) lives inside `DataExport*/`, which is ignored
+wholesale. As an extra safeguard, a pre-commit hook refuses to commit these
+files even if they are force-added. Enable it once per clone:
 
 ```bash
 git config core.hooksPath hooks
