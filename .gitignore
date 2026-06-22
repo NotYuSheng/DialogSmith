@@ -4,3 +4,21 @@
 /saves
 /LLaMA-Factory
 /merged
+DataExport*/
+ChatExport*/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
+# Telegram API auth / secrets — never commit
+*.session
+*.session-journal
+.env
+
+# Telegram media / contacts — never commit (also covered inside DataExport*/)
+*.vcard
+*.tgs
+*.webp
+*.ogg
+*.oga
