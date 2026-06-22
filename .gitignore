@@ -7,6 +7,10 @@
 DataExport*/
 ChatExport*/
 
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
 # Telegram API auth / secrets — never commit
 *.session
 *.session-journal
