@@ -21,7 +21,7 @@ VERSIONS = "Python 3.11–3.13   ·   LLaMA-Factory 0.9.4   ·   local LLM"
 MADEBY = "made by @NotYuSheng"
 
 AMBER = (242, 176, 76)
-GRAD0, GRAD1 = (255, 196, 84), (233, 84, 64)   # gold -> coral, horizontal gradient
+GRAD0, GRAD1 = (255, 196, 84), (233, 84, 64)   # gold -> coral, vertical gradient
 DIM = (140, 140, 150)
 
 RESET = "\x1b[0m"
@@ -116,6 +116,7 @@ def render_gif():
     for line in card:
         emit(line + "\r\n", 0.08)
     emit("", 2.4)                     # hold on the finished card
+    emit("\x1b[?25h", 0.0)            # restore cursor
 
     cast = os.path.join(ROOT, "demo/demo.cast")
     with open(cast, "w", encoding="utf-8") as f:
