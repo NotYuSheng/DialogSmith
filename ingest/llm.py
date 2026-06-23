@@ -1,22 +1,21 @@
 """Shared OpenAI-compatible LLM client.
 
 One client for every optional LLM feature (quality validation, LLM redaction).
-It speaks the OpenAI Chat Completions API, so it works against OpenAI itself
-*and* any local/self-hosted server that exposes that API — Ollama, vLLM, LM
-Studio, llama.cpp's server, LiteLLM, etc. Running a local endpoint is the
-privacy-preserving way to use these features, since your chat text never leaves
-your machine.
+It speaks the OpenAI Chat Completions API, which is the de-facto standard that
+local/self-hosted servers also expose — vLLM, LM Studio, llama.cpp's server,
+Ollama, LiteLLM, etc. For privacy, run a LOCAL endpoint so your chat text never
+leaves your machine; that is the intended setup for this project.
 
 Environment variables:
   LLM_VALIDATE   true/false. Default: enabled when LLM_API_KEY or
                  LLM_API_BASE_URL is set, disabled otherwise.
-  LLM_API_BASE_URL  OpenAI-compatible base URL. Set this for a local model, e.g.
-                 http://localhost:11434/v1 (Ollama) or http://localhost:8000/v1
-                 (vLLM). Unset → OpenAI's hosted API.
-  LLM_MODEL      Model id (default: gpt-4o-mini). For a local server use whatever
-                 it serves, e.g. "qwen2.5" or "llama3.1".
-  LLM_API_KEY    API key. Local servers usually accept any value; falls back to
-                 OPENAI_API_KEY if unset.
+  LLM_API_BASE_URL  Base URL of your local OpenAI-compatible server, e.g.
+                 http://localhost:8000/v1 (vLLM) or http://localhost:1234/v1
+                 (LM Studio).
+  LLM_MODEL      Model id your server serves — required to use the LLM features
+                 (no default). Use the HF repo id, as vLLM / LM Studio do
+                 (e.g. "Qwen/Qwen2.5-7B-Instruct").
+  LLM_API_KEY    API key. Local servers usually accept any value.
 """
 
 import os
@@ -25,7 +24,6 @@ VALIDATE_ENV = "LLM_VALIDATE"
 MODEL_ENV = "LLM_MODEL"
 BASE_URL_ENV = "LLM_API_BASE_URL"
 API_KEY_ENV = "LLM_API_KEY"
-DEFAULT_MODEL = "gpt-4o-mini"
 
 
 def base_url() -> str:
@@ -33,7 +31,8 @@ def base_url() -> str:
 
 
 def model() -> str:
-    return os.environ.get(MODEL_ENV, "").strip() or DEFAULT_MODEL
+    """The configured model id, or empty string if unset (no default)."""
+    return os.environ.get(MODEL_ENV, "").strip()
 
 
 def is_local() -> bool:
@@ -66,6 +65,11 @@ def get_client():
         raise ImportError(
             "The 'openai' package is required for LLM features. "
             "Install it with: pip install openai"
+        )
+    if not model():
+        raise EnvironmentError(
+            f"{MODEL_ENV} is not set. Set it to the model your local server serves "
+            f"(e.g. Qwen/Qwen2.5-7B-Instruct), or set {VALIDATE_ENV}=false."
         )
     url = base_url()
     key = _api_key()

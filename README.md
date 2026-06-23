@@ -103,15 +103,13 @@ python -m ingest --source telegram
 
 **3. (Optional) Configure LLM features**
 
-Copy `example.env` to `.env` (the setup scripts do this for you) and fill it in to enable the quality auditor and LLM redaction. Local endpoints keep your chat data on your machine:
+The core pipeline needs no LLM. To *also* enable the quality auditor and LLM redaction, copy `example.env` to `.env` (the setup scripts do this) and point it at a **local** OpenAI-compatible server (vLLM, LM Studio, llama.cpp) so your chat data stays on your machine:
 
 ```dotenv
 LLM_VALIDATE=true
-LLM_MODEL=gpt-4o-mini
-LLM_API_KEY=your_api_key_here
-# For a local model instead (key can be any value):
-# LLM_API_BASE_URL=http://localhost:11434/v1
-# LLM_MODEL=qwen2.5
+LLM_API_BASE_URL=http://localhost:8000/v1     # vLLM (LM Studio uses :1234/v1)
+LLM_MODEL=Qwen/Qwen2.5-7B-Instruct            # the model your server serves
+LLM_API_KEY=local                             # local servers accept any value
 ```
 
 **4. Fine-tune**
@@ -140,7 +138,7 @@ llamafactory-cli train configs/train_lora.yaml
 
 ### Optional: LLM quality auditing
 
-Each extracted conversation can be scored for **coherence, quality, and pairing**, dropping or splitting weak samples before training. It uses the OpenAI-compatible API, so it works with OpenAI **or any local server** (Ollama, vLLM, LM Studio). It's enabled automatically when `LLM_API_KEY` or `LLM_API_BASE_URL` is set (configure it in `.env`, step 3 above).
+Each extracted conversation can be scored for **coherence, quality, and pairing**, dropping or splitting weak samples before training. It talks to a **local** OpenAI-compatible server (vLLM, LM Studio, llama.cpp) so your chat data stays on your machine. It's enabled automatically when `LLM_API_KEY` or `LLM_API_BASE_URL` is set (configure it in `.env`, step 3 above).
 
 To turn it off, set `LLM_VALIDATE=false` in `.env` (persistent) or pass `--skip-validation` for a single run. To disable **all** auditing at once — both this and the regex scan — use `--no-audit`.
 
@@ -186,7 +184,7 @@ Singapore ships as the worked reference ([`sg.py`](ingest/redaction/sg.py): nati
 Regex can't catch everything (names, context-dependent secrets). With `--llm-redact`, an LLM additionally flags such spans into the **same report and the same `--redact` step** — it points at verbatim spans, never rewriting your text. To protect your data it **prefers a local endpoint**: set `LLM_API_BASE_URL` to a local OpenAI-compatible server; without one it refuses to use a hosted API unless you pass `--allow-cloud-redaction`.
 
 ```bash
-LLM_API_BASE_URL=http://localhost:11434/v1 LLM_MODEL=qwen2.5 \
+LLM_API_BASE_URL=http://localhost:8000/v1 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct \
   python -m ingest --source telegram --llm-redact --redact replace
 ```
 
@@ -300,7 +298,7 @@ The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is 
 
 Doppelganger is as much a **learning sandbox** as a tool: the aim is to explore the *full* AI toolbox for capturing how a person communicates, and to find what actually moves the needle on *"does this sound like me?"*. Today that's LoRA fine-tuning — everything below is exploratory (see the issue tracker for the live backlog).
 
-**Shaping the model** — pre-training · fine-tuning (today) · alignment/DPO · continual learning · synthetic data / self-instruct · multi-LoRA personas & merging · distillation to on-device · PEFT comparison
+**Shaping the model** — pre-training · fine-tuning · alignment/DPO · continual learning · synthetic data / self-instruct · multi-LoRA personas & merging · distillation to on-device · PEFT comparison
 
 **Giving it context & memory** — RAG · long-term memory + reflection · relationship/knowledge graph · style embeddings / user-conditioning · persona-prompt quiz · MCP
 
