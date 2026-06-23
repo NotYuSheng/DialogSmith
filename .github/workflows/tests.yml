@@ -1,0 +1,28 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches the Python range required by LLaMA-Factory 0.9.4.
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # The ingestion pipeline is pure stdlib, so the tests need no dependencies
+      # (no llamafactory/torch install — those are only needed for training).
+      - name: Run tests
+        run: python -m unittest discover -s tests -t . -v

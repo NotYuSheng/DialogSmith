@@ -1,11 +1,17 @@
-# Doppelganger – Fine-Tune Models on Your Telegram History
+# Doppelganger – Fine-Tune Models on Your Chat History
 
-**Doppelganger** lets you fine-tune large language models (LLMs) like Qwen on your own Telegram conversations.
-Built on top of [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), it automatically formats data into the ShareGPT format for supervised fine-tuning (SFT).
+**Doppelganger** lets you fine-tune large language models (LLMs) like Qwen on your own chat
+conversations. Built on top of [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), it
+formats your data into the ShareGPT format for supervised fine-tuning (SFT).
+
+Ingestion is **source-agnostic**: a small adapter parses each platform's export into a normalized
+message stream, and the rest of the pipeline (sessionizing, turn-merging, optional quality
+validation, ShareGPT formatting) is shared. **Telegram** is supported today; other sources
+(WhatsApp, etc.) are planned and slot in as drop-in adapters — see [issue #9](https://github.com/NotYuSheng/Doppelganger/issues/9).
 
 ## Purpose
 
-Fine-tuning on Telegram data can capture aspects of your text style, including:
+Fine-tuning on chat data can capture aspects of your text style, including:
 
 * Writing tone, vocabulary, and phrasing
 * Typical response lengths and structure
@@ -33,8 +39,8 @@ Fine-tuning on real chat history may unintentionally encode:
 
 ### Keeping your data out of git
 
-Your Telegram export and any generated datasets are ignored by `.gitignore`
-(`result.json`, `*.jsonl`, `DataExport*/`, `*.session`, `.env`, plus Telegram
+Your chat export and any generated datasets are ignored by `.gitignore`
+(`result.json`, `*.json`, `*.jsonl`, `DataExport*/`, `*.session`, `.env`, plus Telegram
 media/contacts such as `*.vcard`, `*.tgs`, `*.webp`, `*.ogg`/`*.oga`). Generic
 media (`.jpg`, `.mp4`, …) lives inside `DataExport*/`, which is ignored
 wholesale. As an extra safeguard, a pre-commit hook refuses to commit these
@@ -46,7 +52,13 @@ git config core.hooksPath hooks
 
 To deliberately commit a blocked file, bypass the hook with `git commit --no-verify`.
 
-## Export Telegram Chat
+## Requirements
+
+* **Python 3.11–3.13** (required by LLaMA-Factory 0.9.4)
+* A CUDA-capable GPU for training, with a matching [PyTorch build](https://pytorch.org/get-started/locally/)
+* `git`
+
+## Export Your Telegram Chat
 
 1. Open **Telegram Desktop**.
 2. Go to: `Settings > Advanced > Export Telegram Data`.
@@ -60,148 +72,134 @@ Doppelganger/
 │   └── result.json  ← Place here
 ```
 
----
+## Setup
 
-## Setup Instructions (Windows)
+The setup scripts create a virtual environment, install pinned dependencies
+(LLaMA-Factory **0.9.4**), and process your export into `data/chat_sharegpt.json`.
 
-Run the automated setup script from **Command Prompt** (not PowerShell):
+**Linux / macOS:**
+
+```bash
+./setup.sh
+```
+
+**Windows** (from **Command Prompt**, not PowerShell):
 
 ```cmd
 setup.bat
 ```
 
-This will:
+Prefer to do it manually? The scripts are thin wrappers around:
 
-* Create and activate a Python virtual environment
-* Upgrade `pip`
-* Clone the official [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) repository and install Python dependencies from `requirements.txt`
-* Patch `dataset_info.json` to register your dataset (`chat_sharegpt`)
-* Process your exported Telegram chat (`result.json`) into `chat_sharegpt.json`
-* Place the converted dataset in the correct directory (`LLaMA-Factory/data`)
-
-Once complete, you will see:
-
-```
-All steps completed successfully.
-Please refer to the README.md for the next steps.
-You will find instructions on how to launch training.
+```bash
+python -m venv venv
+# activate: source venv/bin/activate   (Windows: venv\Scripts\activate)
+pip install -r requirements.txt
+python -m ingest --source telegram
 ```
 
-Make sure your `result.json` file is already located at:
+### Ingestion options
 
+`python -m ingest` turns a raw export into a dataset. Useful flags:
+
+| Flag                  | Default                   | Description                                            |
+| --------------------- | ------------------------- | ------------------------------------------------------ |
+| `--source`            | `telegram`                | Chat source to parse (more planned)                    |
+| `--input`             | `./data/result.json`      | Path to the raw export                                 |
+| `--format`            | `sharegpt`                | `sharegpt` (for training) or `jsonl` (intermediate)    |
+| `--self-name`         | auto-detected             | Override which sender is "you"                         |
+| `--conversation-gap`  | `3600`                    | Seconds of silence that start a new conversation       |
+| `--message-chain`     | `30`                      | Max seconds between same-sender messages to merge      |
+
+### Optional: LLM quality validation
+
+Each extracted conversation can be scored for coherence and quality, dropping weak samples before
+training. It is enabled automatically when `ANTHROPIC_API_KEY` is set. Copy `.env.example` to `.env`
+and fill it in (the setup scripts do this for you):
+
+```dotenv
+DIALOGSMITH_LLM_VALIDATE=true
+DIALOGSMITH_LLM_MODEL=claude-haiku-4-5-20251001
+ANTHROPIC_API_KEY=your_api_key_here
 ```
-./data/result.json
-```
+
+Set `DIALOGSMITH_LLM_VALIDATE=false` to skip validation entirely (no API calls).
 
 ## Fine-Tune Your Model (LoRA)
 
-The following example uses **Qwen1.5-1.8B-Chat**, but you can **replace it with any Hugging Face-compatible model**.
+Training is configured by [`configs/train_lora.yaml`](configs/train_lora.yaml), which defaults to
+**Qwen1.5-1.8B-Chat** and the `chat_sharegpt` dataset registered in
+[`configs/dataset_info.json`](configs/dataset_info.json). Activate your venv, then run:
 
-### Basic LoRA Fine-Tuning Command
-
-```cmd
-python LLaMA-Factory\src\train.py --stage sft --do_train ^
-  --model_name_or_path Qwen/Qwen1.5-1.8B-Chat ^
-  --dataset chat_sharegpt ^
-  --dataset_dir .\LLaMA-Factory\data ^
-  --template qwen ^
-  --finetuning_type lora ^
-  --lora_target Wqkv,o_proj,gate_proj,down_proj,up_proj ^
-  --output_dir saves\Qwen1.5-1.8B-Chat-lora ^
-  --overwrite_cache ^
-  --per_device_train_batch_size 2 ^
-  --gradient_accumulation_steps 4 ^
-  --lr_scheduler_type cosine ^
-  --logging_steps 10 ^
-  --save_strategy steps ^
-  --save_steps 100 ^
-  --learning_rate 5e-5 ^
-  --num_train_epochs 3.0 ^
-  --plot_loss
+```bash
+llamafactory-cli train configs/train_lora.yaml
 ```
 
----
+### Customize for your model
 
-### How to Customize for Your Model
+Edit `configs/train_lora.yaml`:
 
-Modify these flags to match your model:
-
-| Option                 | Description                                              |
+| Field                  | Description                                              |
 | ---------------------- | -------------------------------------------------------- |
-| `--model_name_or_path` | Hugging Face model ID or local model path                |
-| `--template`           | Prompt template type (e.g., `qwen`, `chatml`, `default`) |
-| `--lora_target`        | LoRA target modules (refer to model’s architecture)      |
-| `--output_dir`         | Destination to save the LoRA checkpoints                 |
+| `model_name_or_path`   | Hugging Face model ID or local model path                |
+| `template`             | Prompt template type (e.g., `qwen`, `chatml`, `default`) |
+| `lora_target`          | LoRA target modules (`all` works across architectures)   |
+| `output_dir`           | Destination to save the LoRA checkpoints                 |
 
-If you're using a model like `mistralai/Mistral-7B-Instruct-v0.2`, you would change:
+For example, to use `mistralai/Mistral-7B-Instruct-v0.2`, set `model_name_or_path` accordingly and
+`template: chatml`. Refer to the
+[LLaMA-Factory model table](https://github.com/hiyouga/LLaMA-Factory#supported-models) for recommended values.
 
-```cmd
---model_name_or_path mistralai/Mistral-7B-Instruct-v0.2 ^
---template chatml ^
---lora_target q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj ^
---output_dir saves\Mistral-7B-Instruct-lora ^
-```
+### Resume training
 
-Refer to the [LLaMA-Factory model table](https://github.com/hiyouga/LLaMA-Factory#currently-supported-models) for recommended values.
-
----
-
-### To Resume Training
-
-Find your latest checkpoint under your `saves` folder, then add this flag:
-
-```cmd
---resume_from_checkpoint saves\Qwen1.5-1.8B-Chat-lora\checkpoint-400
-```
-
----
-
-### Merge LoRA Adapter with Base Model
-
-Edit the `export_lora.yaml` file to match your model:
+Uncomment and point `resume_from_checkpoint` in `configs/train_lora.yaml` at your latest checkpoint:
 
 ```yaml
-# export_lora.yaml
-base_model: Qwen/Qwen1.5-1.8B-Chat
-lora_model: saves/Qwen1.5-1.8B-Chat-lora
-output_dir: merged/Qwen1.5-1.8B-Chat-merged
+resume_from_checkpoint: saves/Qwen1.5-1.8B-Chat-lora/checkpoint-400
 ```
 
-Then run:
+### Merge the LoRA adapter with the base model
 
-```cmd
-llamafactory-cli export export_lora.yaml
+Edit [`configs/export_lora.yaml`](configs/export_lora.yaml) to match your model, then run:
+
+```bash
+llamafactory-cli export configs/export_lora.yaml
 ```
 
----
+### Chat with your fine-tuned model
 
-### Chat Inference with Fine-Tuned Model
-
-Test your merged model in an interactive shell:
-
-```cmd
-llamafactory-cli chat ^
-  --model_name_or_path merged/Qwen1.5-1.8B-Chat-merged ^
+```bash
+llamafactory-cli chat \
+  --model_name_or_path merged/Qwen1.5-1.8B-Chat-merged \
   --template qwen
 ```
 
 Update `--template` to match the one used during training.
 
-## Manually Activate the Virtual Environment
+## Activating the environment later
 
-If you’ve already run `setup.bat`, the virtual environment is created automatically.
-In future sessions, you can activate it manually before running any Python scripts:
+After running setup once, reactivate the venv in future sessions before running any commands:
 
-### Activate on Windows (Command Prompt)
-
-```cmd
-venv\Scripts\activate
+```bash
+source venv/bin/activate          # Linux / macOS
+venv\Scripts\activate             # Windows (Command Prompt)
 ```
 
-You should see the prompt change to show that the environment is active:
+## Running the tests
 
-```
-(venv) C:\Users\yourname\Doppelganger>
+The ingestion pipeline (parsing, sessionizing, turn-merging, ShareGPT formatting) is covered by a
+fast unit suite — no GPU, network, or API key required:
+
+```bash
+python -m unittest discover -s tests -t .
 ```
 
-Once activated, you can run `python`, `pip`, or training commands as usual.
+It runs in well under a second and locks in the conversion behaviour, so you can verify a change
+without running the full pipeline.
+
+## Legacy workflow
+
+The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is preserved at the
+[`v0.1.0`](https://github.com/NotYuSheng/Doppelganger/releases/tag/v0.1.0) tag. The old
+`scripts/telegram_extract.py` and `scripts/convert_to_sharegpt.py` still work as thin deprecated
+wrappers around `python -m ingest`, but will be removed in a future release.

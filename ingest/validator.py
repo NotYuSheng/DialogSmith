@@ -101,7 +101,8 @@ def validate_samples(samples):
     """
     Validate a list of conversation samples.
 
-    Each sample is a list of {"role": ..., "text": ...} dicts (as produced by telegram_extract.py).
+    Each sample is a list of {"role": ..., "text": ...} dicts (as produced by
+    ingest.core.build_samples).
 
     Returns filtered list of samples that pass validation.
     If validation is disabled or unavailable, returns all samples unchanged.

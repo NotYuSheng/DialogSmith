@@ -7,6 +7,9 @@
 DataExport*/
 ChatExport*/
 
+# Tracked project config (re-include despite the broad *.json rule above)
+!configs/dataset_info.json
+
 # Python cache / bytecode
 __pycache__/
 *.py[cod]

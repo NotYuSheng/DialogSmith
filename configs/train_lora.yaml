@@ -1,0 +1,45 @@
+# LoRA fine-tuning config for LLaMA-Factory.
+#   llamafactory-cli train configs/train_lora.yaml
+#
+# Defaults target Qwen1.5-1.8B-Chat. To use another model, change
+# model_name_or_path + template (see the LLaMA-Factory model table) and,
+# optionally, output_dir.
+
+### model
+model_name_or_path: Qwen/Qwen1.5-1.8B-Chat
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all          # all linear layers; works across architectures
+lora_rank: 8
+
+### dataset
+dataset: chat_sharegpt    # registered in configs/dataset_info.json
+dataset_dir: configs
+template: qwen            # match your model's chat template (e.g. qwen, chatml, default)
+cutoff_len: 2048
+overwrite_cache: true
+preprocessing_num_workers: 4
+
+### output
+output_dir: saves/Qwen1.5-1.8B-Chat-lora
+logging_steps: 10
+save_steps: 100
+save_strategy: steps
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-5
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true                # set fp16: true instead on older GPUs without bf16
+
+# To resume from a checkpoint, uncomment and point at your latest one:
+# resume_from_checkpoint: saves/Qwen1.5-1.8B-Chat-lora/checkpoint-400
