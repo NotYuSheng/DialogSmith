@@ -1,38 +1,29 @@
-import json
+#!/usr/bin/env python3
+"""DEPRECATED shim — kept for backwards compatibility, removed in a future release.
 
-input_path = "./data/chat_dataset.jsonl"
-output_path = "./data/chat_sharegpt.json"
+The new pipeline writes ShareGPT directly:
 
-ROLE_MAP = {
-    "user": "human",
-    "assistant": "gpt",
-}
+    python -m ingest --source telegram --format sharegpt
 
-output_data = []
+This shim still converts an existing data/chat_dataset.jsonl into
+data/chat_sharegpt.json, delegating to the new ``ingest`` package.
+"""
 
-with open(input_path, "r", encoding="utf-8") as infile:
-    for line in infile:
-        sample = json.loads(line)
-        turns = sample.get("conversations", [])
+import os
+import sys
 
-        if not turns:
-            continue
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-        conversations = []
-        for turn in turns:
-            role = ROLE_MAP.get(turn.get("role", ""), turn.get("role", ""))
-            text = turn.get("text", "").strip()
-            if role and text:
-                conversations.append({"from": role, "value": text})
+from ingest import sharegpt  # noqa: E402
 
-        # Must have at least one human and one gpt turn
-        roles_present = {t["from"] for t in conversations}
-        if "human" not in roles_present or "gpt" not in roles_present:
-            continue
+INPUT_PATH = "./data/chat_dataset.jsonl"
+OUTPUT_PATH = "./data/chat_sharegpt.json"
 
-        output_data.append({"conversations": conversations})
-
-with open(output_path, "w", encoding="utf-8") as outfile:
-    json.dump(output_data, outfile, indent=2, ensure_ascii=False)
-
-print(f"Converted {len(output_data)} valid conversation samples to ShareGPT format.")
+if __name__ == "__main__":
+    sys.stderr.write(
+        "[deprecated] scripts/convert_to_sharegpt.py -> use: "
+        "python -m ingest --source telegram --format sharegpt\n"
+    )
+    samples = sharegpt.load_jsonl_samples(INPUT_PATH)
+    written = sharegpt.write_sharegpt(samples, OUTPUT_PATH)
+    print(f"Converted {written} valid conversation samples to ShareGPT format.")
