@@ -157,15 +157,18 @@ def validate_samples(samples):
             r["quality"] < QUALITY_THRESHOLD or
             r["pairing"] < PAIRING_THRESHOLD
         )
-        if r["action"] == "drop" or low:
-            filtered.append((i, "dropped", r))
-        elif r["action"] == "split":
+        # Try repair-by-split first: an over-merged sample scores low on
+        # coherence/pairing, so checking `low` before `split` would always drop
+        # the very samples split is meant to rescue.
+        if r["action"] == "split":
             pieces = [p for p in _apply_split(turns, r["split_after"]) if _has_both_roles(p)]
             if pieces:
                 passed.extend(pieces)
                 split_count += 1
             else:
                 filtered.append((i, "split-empty", r))
+        elif r["action"] == "drop" or low:
+            filtered.append((i, "dropped", r))
         else:
             passed.append(turns)
 

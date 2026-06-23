@@ -256,6 +256,36 @@ class ValidatorSplitTest(unittest.TestCase):
         self.assertFalse(_has_both_roles([{"role": "user"}, {"role": "user"}]))
 
 
+class _FakeOpenAI:
+    """Stub OpenAI-compatible client returning canned JSON (no network)."""
+    def __init__(self, text):
+        import types
+        msg = types.SimpleNamespace(content=text)
+        resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+        self.chat = types.SimpleNamespace(
+            completions=types.SimpleNamespace(create=lambda **kw: resp))
+
+
+class ValidatorSplitPriorityTest(unittest.TestCase):
+    def test_split_runs_even_when_scores_are_low(self):
+        from ingest import validator, llm
+        canned = ('{"coherence":0.2,"quality":0.2,"pairing":0.2,'
+                  '"action":"split","split_after":[1],"reason":"two convos"}')
+        orig_get, orig_should = llm.get_client, llm.should_validate
+        llm.get_client = lambda: _FakeOpenAI(canned)
+        llm.should_validate = lambda: True
+        os.environ["LLM_MODEL"] = "x"
+        try:
+            sample = [{"role": "user", "text": "a"}, {"role": "assistant", "text": "b"},
+                      {"role": "user", "text": "c"}, {"role": "assistant", "text": "d"}]
+            out = validator.validate_samples([sample])
+            # Low scores would previously drop it; now split runs first -> 2 pieces.
+            self.assertEqual(len(out), 2)
+        finally:
+            llm.get_client, llm.should_validate = orig_get, orig_should
+            os.environ.pop("LLM_MODEL", None)
+
+
 class RegistryTest(unittest.TestCase):
     def test_telegram_registered(self):
         self.assertIn("telegram", available_sources())
@@ -281,6 +311,25 @@ class CliTest(unittest.TestCase):
     def test_unknown_source_exit_code(self):
         from ingest.cli import main
         self.assertEqual(main(["--source", "nope"]), 2)
+
+    def test_redact_applies_even_when_scan_skipped(self):
+        # --redact must still redact when the scan is skipped (no silent leak).
+        from ingest.cli import main
+        os.environ["LLM_VALIDATE"] = "false"
+        with tempfile.TemporaryDirectory() as d:
+            inp = os.path.join(d, "result.json")
+            with open(inp, "w", encoding="utf-8") as f:
+                json.dump({"personal_information": {"first_name": "Yu", "last_name": "Sheng"},
+                           "chats": {"list": [{"id": 1, "messages": [
+                               _msg("Alice", 100, "mail me at a@b.com"),
+                               _msg(SELF, 110, "ok")]}]}}, f)
+            out = os.path.join(d, "out.json")
+            rc = main(["--source", "telegram", "--input", inp, "--output", out,
+                       "--skip-redact-scan", "--redact", "replace"])
+            self.assertEqual(rc, 0)
+            blob = json.dumps(json.load(open(out, encoding="utf-8")))
+            self.assertIn("[EMAIL]", blob)
+            self.assertNotIn("a@b.com", blob)
 
 
 if __name__ == "__main__":

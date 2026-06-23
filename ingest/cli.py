@@ -207,27 +207,33 @@ def main(argv=None) -> int:
     if args.no_audit:
         print("[audit] All auditing disabled (--no-audit) — building dataset as-is.")
 
+    locales = [s.strip() for s in args.redact_locales.split(",") if s.strip()]
+    llm_findings = []
     if not skip_scan:
-        locales = [s.strip() for s in args.redact_locales.split(",") if s.strip()]
         report = redactor.scan_samples(samples, locales=locales)
-
-        llm_findings = []
         if args.llm_redact:
             llm_findings = _run_llm_redaction(samples, args.allow_cloud_redaction)
             redactor.merge_llm_findings(report, llm_findings)
-
         report_path = os.path.join(os.path.dirname(output) or ".", "redaction_report.json")
         redactor.write_report(report, report_path)
         redactor.print_summary(report, report_path, mode=args.redact)
-        if args.redact != "off":
-            before = len(samples)
-            samples = redactor.apply(
-                samples, args.redact, locales=locales, llm_findings=llm_findings
-            )
+
+    # --redact is an explicit request, so honour it even when the scan/report was
+    # skipped — otherwise the dataset would silently keep sensitive data.
+    if args.redact != "off":
+        if skip_scan:
             print(
-                f"[redactor] Applied --redact {args.redact}: "
-                f"{before} -> {len(samples)} samples."
+                f"[redactor] Scan skipped, but --redact {args.redact} was requested — "
+                "applying regex redaction (note: --llm-redact needs the scan)."
             )
+        before = len(samples)
+        samples = redactor.apply(
+            samples, args.redact, locales=locales, llm_findings=llm_findings
+        )
+        print(
+            f"[redactor] Applied --redact {args.redact}: "
+            f"{before} -> {len(samples)} samples."
+        )
 
     if not skip_validation:
         samples = validate_samples(samples)

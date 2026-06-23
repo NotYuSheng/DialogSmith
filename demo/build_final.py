@@ -12,7 +12,7 @@ import pyfiglet
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "venv", "bin", "python")
-AGG = "/tmp/agg"
+AGG = os.environ.get("AGG", "agg")  # asciinema agg on PATH; override with $AGG
 GAP = "   "
 TAG = "fine-tune an LLM to write like you"
 CMD = "python -m ingest --source telegram --input demo/sample_export.json"
@@ -67,7 +67,8 @@ def write_banner_module():
 
 def render_gif():
     env = dict(os.environ, LLM_VALIDATE="false", DOPPELGANGER_NO_BANNER="1")
-    out = subprocess.run([PY] + CMD.split()[1:], cwd=ROOT, env=env, capture_output=True, text=True)
+    out = subprocess.run([PY, *CMD.split()[1:]], cwd=ROOT, env=env,
+                         capture_output=True, text=True, check=True)
     report = ((out.stdout or "") + (out.stderr or "")).split("\n")
 
     events, t = [], 0.0
@@ -90,7 +91,7 @@ def render_gif():
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
     subprocess.run([AGG, "--font-size", "18", "--theme", "dracula", cast,
                     os.path.join(ROOT, "demo/demo.gif")],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=True)
 
 
 if __name__ == "__main__":

@@ -34,4 +34,7 @@ def to_ascii(path: str, cols: int = 42, invert: bool = False) -> str:
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a != "--invert"]
+    if not args:
+        print("Usage: python demo/img2ascii.py PATH [cols] [--invert]", file=sys.stderr)
+        raise SystemExit(2)
     print(to_ascii(args[0], int(args[1]) if len(args) > 1 else 42, "--invert" in sys.argv))
