@@ -22,14 +22,16 @@ Sample = List[Turn]
 
 
 def _group_by_chat(messages: Iterable[NormalizedMessage]) -> List[List[NormalizedMessage]]:
-    """Group messages by ``chat_id``, preserving first-seen order.
+    """Group messages by ``chat_id``, each sorted chronologically.
 
     Conversations never span chats, so each chat is processed independently.
+    Messages are sorted by timestamp (stable, so same-timestamp order is
+    preserved) because not every source guarantees chronological order.
     """
     groups: "Dict[str, List[NormalizedMessage]]" = {}
     for msg in messages:
         groups.setdefault(msg.chat_id, []).append(msg)
-    return list(groups.values())
+    return [sorted(g, key=lambda m: m.timestamp) for g in groups.values()]
 
 
 def _split_into_conversations(

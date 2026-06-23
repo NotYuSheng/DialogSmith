@@ -24,6 +24,7 @@ if not exist ".env" (
 )
 
 echo [4/4] Processing Telegram export (data\result.json -^> data\chat_sharegpt.json)...
+if not exist "data" mkdir "data"
 if not exist "data\result.json" (
     echo       data\result.json not found. Place your Telegram export there, then re-run.
     exit /b 1

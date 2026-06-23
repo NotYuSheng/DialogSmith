@@ -28,7 +28,7 @@ def _get_text(msg: dict) -> str:
         return text.strip()
     if isinstance(text, list):
         return "".join(
-            t["text"] if isinstance(t, dict) else t
+            t.get("text", "") if isinstance(t, dict) else str(t)
             for t in msg.get("text_entities", text)
         ).strip()
     return ""
@@ -50,6 +50,12 @@ class TelegramAdapter:
 
         if self_name is None:
             self_name = _detect_self_name(data)
+        if not self_name:
+            raise ValueError(
+                "Could not detect your name from the export's personal_information. "
+                "Provide it manually with --self-name (otherwise every message would be "
+                "treated as 'not you' and all conversations dropped)."
+            )
         print(f"[telegram] Detected user name: {self_name!r}")
 
         messages: List[NormalizedMessage] = []

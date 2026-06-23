@@ -117,6 +117,16 @@ class TelegramAdapterTest(unittest.TestCase):
         alice = [m for m in msgs if m.sender_id == "Alice"][0]
         self.assertTrue(alice.sender_is_self)
 
+    def test_undetectable_self_name_raises(self):
+        # Without personal_information, auto-detection yields "" — which would
+        # silently drop every conversation. Must fail loudly instead.
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "result.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"chats": {"list": []}}, f)
+            with self.assertRaises(ValueError):
+                TelegramAdapter().parse(path)
+
 
 class CoreTest(unittest.TestCase):
     def _samples(self):

@@ -25,6 +25,7 @@ if [ ! -f .env ]; then
 fi
 
 echo "[4/4] Processing Telegram export (data/result.json -> data/chat_sharegpt.json)..."
+mkdir -p data
 if [ ! -f data/result.json ]; then
   echo "      data/result.json not found. Place your Telegram export there, then re-run." >&2
   exit 1
