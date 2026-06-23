@@ -142,6 +142,32 @@ Each extracted conversation can be scored for **coherence, quality, and pairing*
 
 To turn it off, set `LLM_VALIDATE=false` in `.env` (persistent) or pass `--skip-validation` for a single run. To disable **all** auditing at once — both this and the regex scan — use `--no-audit`.
 
+### Running a local LLM (recommended: LM Studio)
+
+The LLM features are designed to run against a **local** model so your chat data never leaves your machine. [LM Studio](https://lmstudio.ai) is the easiest way to get one running with a click-through UI:
+
+1. Install **LM Studio** and use its search to download a model (see the table below).
+2. Open the **Developer** tab → **Start Server**. It serves an OpenAI-compatible API at `http://localhost:1234/v1`.
+3. In `.env`, set:
+   ```dotenv
+   LLM_VALIDATE=true
+   LLM_API_BASE_URL=http://localhost:1234/v1
+   LLM_MODEL=<the model identifier LM Studio shows for the loaded model>
+   LLM_API_KEY=local
+   ```
+
+(Prefer the CLI? **vLLM** serves the same API at `http://localhost:8000/v1` with `--model Qwen/Qwen2.5-7B-Instruct`. **Ollama** also works at `http://localhost:11434/v1`.)
+
+**Which model?** The auditor/redactor just needs solid instruction-following and JSON output — a small model is plenty. Pick by your hardware (GGUF quants in LM Studio shrink the footprint):
+
+| Your hardware | Suggested model | Notes |
+|---------------|-----------------|-------|
+| CPU-only, or ≤8 GB VRAM / 16 GB RAM | **Qwen2.5-3B-Instruct** (Q4) | Fast and light; fine for scoring + PII spans |
+| 8–16 GB VRAM | **Qwen2.5-7B-Instruct** (Q4/Q5) | Recommended balance of quality and speed |
+| 24 GB+ VRAM | **Qwen2.5-14B-Instruct** | Best judgment on tricky/ambiguous cases |
+
+Tiny machine? **Qwen2.5-1.5B-Instruct** or **Llama-3.2-3B-Instruct** also work, with slightly noisier results. Any OpenAI-compatible model will do — these are just sensible starting points.
+
 ## Privacy & Sensitive Data
 
 Fine-tuning on real chat history may unintentionally encode personal identifiers, confidential conversations, or sensitive content.
