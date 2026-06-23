@@ -64,7 +64,10 @@ class TelegramAdapter:
             for msg in chat.get("messages", []):
                 if not _is_valid(msg):
                     continue
-                sender = msg.get("from")
+                # "from" can be missing/None (e.g. anonymous channel posts); fall
+                # back to a label so sender_id stays a str (and multi-speaker
+                # mode doesn't emit a "None: " prefix).
+                sender = msg.get("from") or "Unknown"
                 reply_to = msg.get("reply_to_message_id")
                 msg_id = msg.get("id")
                 messages.append(

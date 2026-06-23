@@ -219,21 +219,28 @@ def llm_scan_samples(samples, client, model) -> List[dict]:
             if not (0 <= ti < len(turns)) or not span:
                 continue
             text = turns[ti].get("text", "")
-            idx = text.find(span)
-            if idx < 0:
+            # Record every non-overlapping occurrence — a repeated name/number
+            # must not leak just because only the first was redacted.
+            start, located = 0, False
+            while True:
+                idx = text.find(span, start)
+                if idx < 0:
+                    break
+                located = True
+                findings.append({
+                    "conversation": ci,
+                    "turn": ti,
+                    "role": turns[ti].get("role"),
+                    "category": str(rf.get("category", "PII")),
+                    "detector": "llm",
+                    "severity": str(rf.get("severity", "medium")),
+                    "start": idx,
+                    "end": idx + len(span),
+                    "preview": redaction.mask(span),
+                })
+                start = idx + len(span)
+            if not located:
                 print(f"[redactor] LLM span not found verbatim (conv {ci}, turn {ti}): {span!r}")
-                continue
-            findings.append({
-                "conversation": ci,
-                "turn": ti,
-                "role": turns[ti].get("role"),
-                "category": str(rf.get("category", "PII")),
-                "detector": "llm",
-                "severity": str(rf.get("severity", "medium")),
-                "start": idx,
-                "end": idx + len(span),
-                "preview": redaction.mask(span),
-            })
     return findings
 
 

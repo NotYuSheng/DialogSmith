@@ -141,6 +141,16 @@ class LlmRedactionTest(unittest.TestCase):
         self.assertEqual(finds[0]["end"], 12)
         self.assertNotIn("Alice", finds[0]["preview"])  # masked
 
+    def test_repeated_span_all_located(self):
+        # Every occurrence of a repeated span must be recorded, not just the first.
+        samples = [[{"role": "user", "text": "Alice told Alice about Alice"},
+                    {"role": "assistant", "text": "ok"}]]
+        client = _FakeClient(
+            '{"findings":[{"turn":0,"text":"Alice","category":"NAME","severity":"high"}]}'
+        )
+        finds = redactor.llm_scan_samples(samples, client, "model")
+        self.assertEqual([f["start"] for f in finds], [0, 11, 23])
+
     def test_unlocatable_span_is_dropped(self):
         # Model paraphrased instead of copying -> can't verify -> skipped.
         client = _FakeClient(
