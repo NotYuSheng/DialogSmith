@@ -296,6 +296,18 @@ It runs in well under a second and locks in the conversion behaviour, so you can
 
 The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is preserved at the [`v0.1.0`](https://github.com/NotYuSheng/Doppelganger/releases/tag/v0.1.0) tag. The old `scripts/telegram_extract.py` and `scripts/convert_to_sharegpt.py` shims have been removed — use `python -m ingest` instead.
 
+## Roadmap
+
+Capturing how someone communicates is bigger than any single method. Today Doppelganger uses **LoRA fine-tuning (SFT)** on your chats; the project intends to explore other training techniques and context sources over time:
+
+- **More training techniques** — beyond fine-tuning, e.g. continued **pre-training** on larger personal corpora and **alignment / preference tuning** (DPO) to refine behaviour.
+- **Persona prompting** — a short quiz that generates a system prompt for explicit preferences/facts, complementing the fine-tuned *style* ([#14](https://github.com/NotYuSheng/Doppelganger/issues/14)).
+- **More chat sources** — WhatsApp, Discord, and others as drop-in adapters ([#9](https://github.com/NotYuSheng/Doppelganger/issues/9)).
+- **Offline NER redaction** — name/location detection without an LLM ([#13](https://github.com/NotYuSheng/Doppelganger/issues/13)).
+- **Wider locale coverage** — more country detector packs ([#15](https://github.com/NotYuSheng/Doppelganger/issues/15) tracks the Singapore gaps).
+
+This is an experimental, for-fun project — the roadmap is exploratory, not a commitment.
+
 ## Star History
 
 <a href="https://star-history.com/#NotYuSheng/Doppelganger&Date">
