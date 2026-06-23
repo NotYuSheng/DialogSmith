@@ -10,6 +10,10 @@ ChatExport*/
 # Tracked project config (re-include despite the broad *.json rule above)
 !configs/dataset_info.json
 
+# Personal training/export overrides — copy a tracked config to *.local.yaml and
+# edit that for your own model/hardware; it stays out of git.
+configs/*.local.yaml
+
 # Python cache / bytecode
 __pycache__/
 *.py[cod]

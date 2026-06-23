@@ -20,8 +20,8 @@ echo "[2/4] Installing dependencies (this can take a while)..."
 
 echo "[3/4] Preparing .env..."
 if [ ! -f .env ]; then
-  cp .env.example .env
-  echo "      Created .env from .env.example — edit it to enable optional LLM validation."
+  cp example.env .env
+  echo "      Created .env from example.env — edit it to enable optional LLM features."
 fi
 
 echo "[4/4] Processing Telegram export (data/result.json -> data/chat_sharegpt.json)..."

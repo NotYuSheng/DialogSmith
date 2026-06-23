@@ -33,6 +33,10 @@ plot_loss: true
 overwrite_output_dir: true
 
 ### train
+# Loss is computed only on your (assistant/"gpt") turns; human turns are masked.
+# This is the SFT default, set explicitly here so --multi-speaker speaker labels
+# on the human side are safe — they condition the model but are never generated.
+train_on_prompt: false
 per_device_train_batch_size: 2
 gradient_accumulation_steps: 4
 learning_rate: 5.0e-5

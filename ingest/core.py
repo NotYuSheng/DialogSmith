@@ -56,6 +56,61 @@ def _split_into_conversations(
     return conversations
 
 
+def _merge_by_reply(
+    conversations: List[List[NormalizedMessage]],
+) -> List[List[NormalizedMessage]]:
+    """Stitch back conversations that a silence gap split but a reply connects.
+
+    A time gap is a guess at where one conversation ends. An explicit reply link
+    is ground truth: if a message replies to one in an earlier (same-chat)
+    conversation, they belong together. We union such conversations and re-sort
+    each merged group chronologically.
+
+    When no message carries reply metadata (``message_id``/``reply_to_id`` all
+    ``None``), there is nothing to union and the input is returned unchanged — so
+    sources without reply data keep the pure time-based behaviour.
+    """
+    n = len(conversations)
+    if n <= 1:
+        return conversations
+
+    id_to_conv = {
+        m.message_id: ci
+        for ci, conv in enumerate(conversations)
+        for m in conv
+        if m.message_id is not None
+    }
+    if not id_to_conv:
+        return conversations
+
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+
+    for ci, conv in enumerate(conversations):
+        for m in conv:
+            target = id_to_conv.get(m.reply_to_id) if m.reply_to_id else None
+            if target is not None and target != ci:
+                union(ci, target)
+
+    groups: "Dict[int, List[NormalizedMessage]]" = {}
+    for ci in range(n):
+        groups.setdefault(find(ci), []).extend(conversations[ci])
+
+    # Order merged groups by their earliest message so output stays chronological.
+    ordered_roots = sorted(groups, key=lambda r: min(m.timestamp for m in groups[r]))
+    return [sorted(groups[r], key=lambda m: m.timestamp) for r in ordered_roots]
+
+
 def _collect_turn(
     conversation: List[NormalizedMessage], start_idx: int, chain_threshold: int
 ):
@@ -82,35 +137,70 @@ def _collect_turn(
     return texts, j
 
 
+def _assemble_turns(raw_turns, multi_speaker: bool) -> Sample:
+    """Turn ``(sender_id, is_self, text)`` runs into role/text turns.
+
+    Roles: the dataset owner is ``assistant`` (this is what the doppelganger
+    learns to produce, so it is *never* labelled), everyone else is ``user``.
+
+    Default mode merges adjacent same-role runs, so in a group chat several
+    people on the "other side" collapse into one ``user`` turn. ``multi_speaker``
+    instead keeps each speaker distinct and prefixes ``user`` turns with the
+    sender (``"Bob: ..."``), only merging consecutive runs from the *same*
+    sender — preserving who-said-what as conditioning context.
+    """
+    turns: Sample = []
+    last_sender = None
+
+    for sender_id, is_self, text in raw_turns:
+        role = "assistant" if is_self else "user"
+        value = f"{sender_id}: {text}" if (multi_speaker and role == "user") else text
+
+        same_role = bool(turns) and turns[-1]["role"] == role
+        # In multi-speaker mode a user turn only merges with the previous turn
+        # when it is the same speaker; otherwise distinct speakers stay distinct.
+        mergeable = same_role and not (
+            multi_speaker and role == "user" and last_sender != sender_id
+        )
+        if mergeable:
+            turns[-1]["text"] += "\n" + value
+        else:
+            turns.append({"role": role, "text": value})
+        last_sender = sender_id
+
+    return turns
+
+
 def build_samples(
     messages: Iterable[NormalizedMessage],
     conversation_gap: int = DEFAULT_CONVERSATION_GAP,
     message_chain: int = DEFAULT_MESSAGE_CHAIN,
+    multi_speaker: bool = False,
 ) -> List[Sample]:
     """Turn normalized messages into multi-turn conversation samples.
 
-    Splits each chat into conversations, merges consecutive same-sender messages
-    into turns, and keeps only conversations containing at least one user turn
-    and one assistant turn.
+    Splits each chat into conversations (stitching reply-linked ones back
+    together), merges consecutive same-sender messages into turns, and keeps
+    only conversations containing at least one user turn and one assistant turn.
+
+    ``multi_speaker`` preserves and labels individual senders in group chats
+    (see :func:`_assemble_turns`); the default collapses the other side.
     """
     samples: List[Sample] = []
 
     for chat_messages in _group_by_chat(messages):
-        for conversation in _split_into_conversations(chat_messages, conversation_gap):
-            turns: Sample = []
+        time_convs = _split_into_conversations(chat_messages, conversation_gap)
+        for conversation in _merge_by_reply(time_convs):
+            raw_turns = []
             i = 0
             while i < len(conversation):
                 texts, next_i = _collect_turn(conversation, i, message_chain)
                 if texts:
-                    role = "assistant" if conversation[i].sender_is_self else "user"
-                    turn_text = "\n".join(texts)
-                    # Merge with previous turn if same role (e.g. gap split a block).
-                    if turns and turns[-1]["role"] == role:
-                        turns[-1]["text"] += "\n" + turn_text
-                    else:
-                        turns.append({"role": role, "text": turn_text})
+                    m = conversation[i]
+                    raw_turns.append((m.sender_id, m.sender_is_self, "\n".join(texts)))
                 i = next_i
 
+            turns = _assemble_turns(raw_turns, multi_speaker)
             roles = {t["role"] for t in turns}
             if "user" in roles and "assistant" in roles:
                 samples.append(turns)
