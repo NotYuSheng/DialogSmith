@@ -1,0 +1,74 @@
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Doppelganger — C4 Container Diagram v1.0.0
+
+' Note: items inside the "Roadmap (exploratory)" boundary are not yet built —
+' they capture the full vision. Their relationships are labelled "(planned)".
+
+Person(user, "You", "Runs the CLI, reviews/sanitizes data, trains and chats with the model")
+
+System_Boundary(system, "Doppelganger") {
+
+  System_Boundary(ingest, "Ingestion Pipeline") {
+    Container(cli, "Ingest CLI", "Python (python -m ingest)", "Orchestrates parse -> sessionize -> redact -> validate -> format")
+    Container(adapters, "Source Adapters", "Python", "Parse a platform export into a normalized message stream (Telegram today)")
+    Container(core, "Sessionizer / Turn-merger", "Python", "Group messages into conversations; merge same-sender chains")
+    Container(redactor, "Redactor", "Python (regex + locale packs)", "Scan & redact sensitive data before training (shipped)")
+    Container(validator, "LLM Validator", "Python", "Optional per-sample coherence/quality scoring")
+    Container(formatter, "ShareGPT Formatter", "Python", "Emit training-ready ShareGPT samples")
+    ContainerDb(dataset, "ShareGPT Dataset", "JSON file", "data/chat_sharegpt.json")
+  }
+
+  System_Boundary(train, "Training & Inference") {
+    Container(trainer, "LoRA Trainer", "LLaMA-Factory 0.9.4", "Supervised LoRA fine-tune on the dataset")
+    ContainerDb(adapter_store, "LoRA Adapter", "safetensors", "saves/ — adapter weights + checkpoints")
+    Container(merger, "Adapter Merge / Export", "LLaMA-Factory", "Merge LoRA into the base for a standalone model")
+    Container(chat, "Inference / Chat", "LLaMA-Factory CLI", "Chat with the fine-tuned model")
+  }
+
+  System_Boundary(roadmap_zone, "Roadmap (exploratory — not yet built)") {
+    Container(sources, "More Chat Sources", "planned", "WhatsApp, Discord, ... + wider locale detector packs")
+    Container(rag, "RAG + Long-term Memory", "planned", "Retrieval, reflection, relationship/knowledge graph, style embeddings")
+    Container(multimodal, "Voice / Multimodal", "planned", "Voice cloning, TTS/STT, stickers / emoji / memes")
+    Container(agentic, "Agentic Doppelganger", "planned", "Multi-agent, proactive / initiative modeling, self-play")
+    Container(guardrails, "Guardrails + Offline NER", "planned", "Differential privacy, machine unlearning, memorization audits")
+    Container(eval, "Evaluation Suite", "planned", "'Does it sound like me?' + 'what did it learn about me?'")
+  }
+}
+
+System_Boundary(external, "External Systems") {
+  Container(hf, "Hugging Face Hub", "HTTPS", "Base model weights (e.g. Qwen2.5-14B-Instruct)")
+  Container(llm, "OpenAI-compatible / Local LLM", "OpenAI Chat Completions API (vLLM / LM Studio / Ollama)", "Scores samples during optional validation")
+}
+
+' Relationships
+Rel(user, cli, "Runs ingestion")
+Rel(cli, adapters, "Parses export")
+Rel(adapters, core, "Normalized messages")
+Rel(core, redactor, "Conversations")
+Rel(redactor, validator, "Redacted samples")
+Rel(validator, formatter, "Kept samples")
+Rel(formatter, dataset, "Writes chat_sharegpt.json")
+Rel(validator, llm, "Scores samples (optional)", "HTTPS")
+
+Rel(user, trainer, "Launches LoRA training")
+Rel(trainer, dataset, "Reads training data")
+Rel(trainer, hf, "Downloads base model", "HTTPS")
+Rel(trainer, adapter_store, "Writes adapter")
+Rel(merger, adapter_store, "Reads adapter")
+Rel(merger, hf, "Reads base model", "HTTPS")
+Rel(user, chat, "Chats with the model")
+Rel(chat, adapter_store, "Loads adapter")
+
+' Roadmap (planned) relationships
+Rel(sources, adapters, "Planned drop-in adapters")
+Rel(guardrails, redactor, "Extends redaction with NER (planned)")
+Rel(rag, chat, "Augments responses with memory (planned)")
+Rel(multimodal, chat, "Adds voice I/O (planned)")
+Rel(agentic, chat, "Drives proactive behaviour (planned)")
+Rel(eval, chat, "Measures style fidelity (planned)")
+
+@enduml
