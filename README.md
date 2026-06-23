@@ -298,29 +298,23 @@ The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is 
 
 ## Roadmap & Vision
 
-Doppelganger is as much a **learning sandbox** as a tool: the aim is to explore the *full* AI toolbox for capturing how a person communicates, and to find what actually moves the needle on *"does this sound like me?"*. Today that's LoRA fine-tuning — everything below is exploratory.
+Doppelganger is as much a **learning sandbox** as a tool: the aim is to explore the *full* AI toolbox for capturing how a person communicates, and to find what actually moves the needle on *"does this sound like me?"*. Today that's LoRA fine-tuning — everything below is exploratory. The full backlog lives under the [`exploration`](https://github.com/NotYuSheng/Doppelganger/issues?q=is%3Aissue+is%3Aopen+label%3Aexploration) label.
 
-**Shaping the model**
-- Training techniques — **pre-training**, **fine-tuning** (today), and **alignment / preference tuning** (DPO).
-- **Continual learning** — keep the model current as new chats arrive, without catastrophic forgetting ([#18](https://github.com/NotYuSheng/Doppelganger/issues/18)).
+**Shaping the model** — pre-training · fine-tuning (today) · alignment/DPO · continual learning ([#18](https://github.com/NotYuSheng/Doppelganger/issues/18)) · synthetic data / self-instruct ([#22](https://github.com/NotYuSheng/Doppelganger/issues/22)) · multi-LoRA personas & merging ([#23](https://github.com/NotYuSheng/Doppelganger/issues/23)) · distillation to on-device ([#24](https://github.com/NotYuSheng/Doppelganger/issues/24)) · PEFT comparison ([#25](https://github.com/NotYuSheng/Doppelganger/issues/25))
 
-**Giving it context & memory**
-- **RAG** — retrieve your past messages and memories at inference instead of baking everything into weights ([#16](https://github.com/NotYuSheng/Doppelganger/issues/16)).
-- **Persona prompting** — a quiz that generates a system prompt for explicit facts/preferences, complementing the fine-tuned *style* ([#14](https://github.com/NotYuSheng/Doppelganger/issues/14)).
-- **MCP** — expose memory/tools (or the doppelganger itself) via the Model Context Protocol ([#20](https://github.com/NotYuSheng/Doppelganger/issues/20)).
+**Giving it context & memory** — RAG ([#16](https://github.com/NotYuSheng/Doppelganger/issues/16)) · long-term memory + reflection ([#26](https://github.com/NotYuSheng/Doppelganger/issues/26)) · relationship/knowledge graph ([#27](https://github.com/NotYuSheng/Doppelganger/issues/27)) · style embeddings / user-conditioning ([#28](https://github.com/NotYuSheng/Doppelganger/issues/28)) · persona-prompt quiz ([#14](https://github.com/NotYuSheng/Doppelganger/issues/14)) · MCP ([#20](https://github.com/NotYuSheng/Doppelganger/issues/20))
 
-**Making it act**
-- **Agentic doppelganger** — tool use and bounded actions on your behalf ([#19](https://github.com/NotYuSheng/Doppelganger/issues/19)).
+**Multimodal** — voice cloning, TTS/STT ([#29](https://github.com/NotYuSheng/Doppelganger/issues/29)) · stickers / emoji / memes ([#30](https://github.com/NotYuSheng/Doppelganger/issues/30))
 
-**Keeping it safe & honest**
-- **Guardrails** — block harmful output and sensitive-data leakage in generations ([#21](https://github.com/NotYuSheng/Doppelganger/issues/21)).
-- Sensitive-data redaction (shipped) + **offline NER** for names/locations ([#13](https://github.com/NotYuSheng/Doppelganger/issues/13)).
+**Making it act** — agentic doppelganger ([#19](https://github.com/NotYuSheng/Doppelganger/issues/19)) · multi-agent & self-play ([#31](https://github.com/NotYuSheng/Doppelganger/issues/31)) · proactive / initiative modeling ([#32](https://github.com/NotYuSheng/Doppelganger/issues/32))
 
-**Knowing if it works**
-- **Evaluation** — measure style fidelity: LLM-as-judge, held-out perplexity, stylometrics, blind human A/B ([#17](https://github.com/NotYuSheng/Doppelganger/issues/17)).
+**Inference-time control** — activation steering / control vectors ([#36](https://github.com/NotYuSheng/Doppelganger/issues/36)) · prompt optimization (DSPy) ([#37](https://github.com/NotYuSheng/Doppelganger/issues/37))
 
-**More data & coverage**
-- More chat sources — WhatsApp, Discord, and others as drop-in adapters ([#9](https://github.com/NotYuSheng/Doppelganger/issues/9)); wider locale detector packs ([#15](https://github.com/NotYuSheng/Doppelganger/issues/15)).
+**Keeping it safe & honest** — guardrails ([#21](https://github.com/NotYuSheng/Doppelganger/issues/21)) · redaction (shipped) + offline NER ([#13](https://github.com/NotYuSheng/Doppelganger/issues/13)) · differential-privacy training ([#33](https://github.com/NotYuSheng/Doppelganger/issues/33)) · machine unlearning ([#34](https://github.com/NotYuSheng/Doppelganger/issues/34)) · memorization audits / canaries / watermarking / federated ([#35](https://github.com/NotYuSheng/Doppelganger/issues/35))
+
+**Knowing if it works** — evaluation, "does it sound like me?" ([#17](https://github.com/NotYuSheng/Doppelganger/issues/17)) · interpretability, "what did it learn about me?" ([#38](https://github.com/NotYuSheng/Doppelganger/issues/38))
+
+**More data & coverage** — more chat sources: WhatsApp, Discord, … ([#9](https://github.com/NotYuSheng/Doppelganger/issues/9)) · wider locale detector packs ([#15](https://github.com/NotYuSheng/Doppelganger/issues/15))
 
 > This is an experimental, for-fun project — the roadmap is a wishlist of things to explore, not a commitment.
 
