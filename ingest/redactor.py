@@ -93,18 +93,21 @@ def print_summary(report: dict, report_path: str, mode: str = "off") -> None:
 def _replace_spans(text: str, spans) -> str:
     """Replace ``(start, end, category)`` spans with ``[CATEGORY]`` placeholders.
 
-    On overlap, keep the longer/outermost span — so an inner ``DOMAIN`` can't
-    survive while its enclosing ``EMAIL`` is dropped, which would leave the email
-    username exposed. Sort by start ascending then end descending, greedily keep
-    non-overlapping spans, and apply right-to-left so earlier offsets stay valid.
+    Overlapping spans are **merged** so the full extent of every detected span is
+    redacted — no partial leaks (e.g. a shorter span can't shadow part of a longer
+    one). Each merged region is labelled by its longest contributing span.
+    Applied right-to-left so earlier offsets stay valid.
     """
-    chosen = []
-    last_end = 0
-    for start, end, cat in sorted(set(spans), key=lambda s: (s[0], -s[1])):
-        if start >= last_end:
-            chosen.append((start, end, cat))
-            last_end = end
-    for start, end, cat in reversed(chosen):
+    merged = []  # [start, end, label_cat, label_len]
+    for start, end, cat in sorted(set(spans)):
+        if merged and start < merged[-1][1]:        # overlaps the previous region
+            region = merged[-1]
+            region[1] = max(region[1], end)
+            if end - start > region[3]:             # longer span -> its label wins
+                region[2], region[3] = cat, end - start
+        else:
+            merged.append([start, end, cat, end - start])
+    for start, end, cat, _ in reversed(merged):
         text = text[:start] + f"[{cat}]" + text[end:]
     return text
 

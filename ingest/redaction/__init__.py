@@ -130,10 +130,12 @@ def scan_text(text: str, locales: Optional[Iterable[str]] = None) -> "List[Findi
         # but report just the number). Otherwise the whole match is the value.
         report_id = "id" in det.pattern.groupindex
         for m in det.pattern.finditer(text):
+            start, end = m.span("id") if report_id else m.span()
+            if start == -1:  # an optional ``id`` group that didn't match this hit
+                continue
             value = m.group("id") if report_id else m.group()
             if det.validator and not det.validator(value):
                 continue
-            start, end = m.span("id") if report_id else m.span()
             findings.append(
                 Finding(
                     detector=det.name,

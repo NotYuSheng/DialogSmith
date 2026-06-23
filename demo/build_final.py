@@ -18,7 +18,8 @@ TAG = "fine-tune an LLM to write like you"
 CMD = "python -m ingest --source telegram --input demo/sample_export.json"
 AMBER, RESET = "\x1b[1;38;2;242;176;76m", "\x1b[0m"
 
-parrot = open(os.path.join(ROOT, "demo/mascot.txt"), encoding="utf-8").read().rstrip("\n").split("\n")
+with open(os.path.join(ROOT, "demo/mascot.txt"), encoding="utf-8") as _f:
+    parrot = _f.read().rstrip("\n").split("\n")
 PW = max(len(l) for l in parrot)
 
 

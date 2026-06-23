@@ -77,6 +77,19 @@ class SingaporeTest(unittest.TestCase):
         self.assertNotIn("NRIC/FIN", _categories("ic S0000001I", []))
 
 
+class OptionalIdGroupTest(unittest.TestCase):
+    def test_unmatched_optional_id_group_is_skipped(self):
+        # A detector whose ``id`` group is optional must not crash / mis-offset
+        # when that group doesn't match a given hit.
+        det = redaction.make("tmp_opt", "TMP", redaction.UNIVERSAL, r"X(?P<id>\d+)?")
+        try:
+            self.assertNotIn("TMP", _categories("X here", []))   # id unmatched -> skipped
+            finds = [f for f in redaction.scan_text("X42", []) if f.category == "TMP"]
+            self.assertEqual(finds[0].value, "42")
+        finally:
+            redaction._REGISTRY.remove(det)
+
+
 class RegistryTest(unittest.TestCase):
     def test_no_duplicate_names(self):
         names = [d.name for d in redaction.iter_detectors()]
@@ -173,16 +186,23 @@ class LlmRedactionTest(unittest.TestCase):
         out = redactor.apply(self._samples(), "replace", llm_findings=llm)
         self.assertEqual(out[0][0]["text"], "hi I'm [NAME] from Acme")
 
-    def test_replace_spans_prefers_outer_span(self):
+    def test_replace_spans_merges_overlaps(self):
         from ingest.redactor import _replace_spans
-        # Partial overlap -> keep the earlier/outer span, one clean replacement.
-        self.assertEqual(_replace_spans("abcdef", [(0, 3, "X"), (2, 5, "Y")]), "[X]def")
-        # Nested: the inner span must not survive while its enclosing span is
-        # dropped (which would leave the uncovered prefix exposed).
+        # Overlapping spans merge so the WHOLE region is redacted (no partial
+        # leak); the merged region is labelled by its longest contributing span.
+        self.assertEqual(_replace_spans("abcdef", [(0, 3, "X"), (2, 5, "Y")]), "[X]f")
         self.assertEqual(
             _replace_spans("a@b.com x", [(0, 7, "EMAIL"), (2, 7, "DOMAIN")]),
             "[EMAIL] x",
         )
+        # A longer, later-starting span must not be shadowed by a shorter earlier
+        # one — the whole region is covered and labelled EMAIL.
+        self.assertEqual(
+            _replace_spans("0123456789ABCDEFGHIJ", [(0, 8, "CTX"), (5, 20, "EMAIL")]),
+            "[EMAIL]",
+        )
+        # Non-overlapping spans stay separate.
+        self.assertEqual(_replace_spans("a b c", [(0, 1, "A"), (4, 5, "C")]), "[A] b [C]")
 
 
 if __name__ == "__main__":
