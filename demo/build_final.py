@@ -48,18 +48,9 @@ def _solid(rgb, s):
     return f"\x1b[1;38;2;{rgb[0]};{rgb[1]};{rgb[2]}m{s}{RESET}" if s.strip() else s
 
 
-def _grad(s):
-    out = []
-    for i, ch in enumerate(s):
-        if ch == " ":
-            out.append(ch)
-            continue
-        t = i / max(1, WW - 1)
-        r = round(GRAD0[0] + (GRAD1[0] - GRAD0[0]) * t)
-        g = round(GRAD0[1] + (GRAD1[1] - GRAD0[1]) * t)
-        b = round(GRAD0[2] + (GRAD1[2] - GRAD0[2]) * t)
-        out.append(f"\x1b[1;38;2;{r};{g};{b}m{ch}")
-    return "".join(out) + RESET
+def _lerp(t):
+    """Colour at fraction t along the top->bottom gradient."""
+    return tuple(round(GRAD0[k] + (GRAD1[k] - GRAD0[k]) * t) for k in range(3))
 
 
 def _center(plain, rgb=None, width=BLOCK_W):
@@ -81,9 +72,11 @@ def lean_rows(on, off):
 def card_rows():
     """The richer title card (coloured) for the GIF."""
     rows = ["", _center(TAGLINE, DIM), ""]
+    n = max(1, len(word) - 1)
     for i, pl in enumerate(parrot):
-        wl = word[i - TOP] if 0 <= i - TOP < len(word) else ""
-        rows.append(pl.ljust(PW) + GAP + (_grad(wl) if wl else ""))
+        j = i - TOP
+        wl = _solid(_lerp(j / n), word[j]) if 0 <= j < len(word) else ""
+        rows.append(pl.ljust(PW) + GAP + wl)
     rows += ["", _center(KEYWORDS, AMBER), ""]
     box = len(VERSIONS) + 2
     rows.append(_center("┌" + "─" * box + "┐", DIM))
