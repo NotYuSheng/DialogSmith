@@ -82,11 +82,13 @@ make(
 )
 
 # Postal code is 6 bare digits — far too noisy alone, so require an explicit
-# "Singapore <code>", "S123456", or "S(123456)" context to keep precision up.
+# "Singapore <code>", "S123456", or "S(123456)" context. The trailing lookahead
+# stops it matching the first 6 digits of a longer token (e.g. the NRIC
+# "S1234567D", which would otherwise read as "S123456").
 make(
     "sg_postal",
     "POSTAL_CODE",
     "SG",
-    r"(?:[Ss]ingapore\s+|\bS\(?)\d{6}\)?",
+    r"(?:[Ss]ingapore\s+|\bS\(?)\d{6}\)?(?![\dA-Za-z])",
     severity="low",
 )

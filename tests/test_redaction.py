@@ -66,6 +66,12 @@ class SingaporeTest(unittest.TestCase):
         self.assertIn("PHONE", _categories("call 9123 4567", ["SG"]))
         self.assertIn("PHONE", _categories("call +65 9123 4567", ["SG"]))
 
+    def test_postal_requires_context_and_not_nric(self):
+        self.assertIn("POSTAL_CODE", _categories("Singapore 560123", ["SG"]))
+        self.assertIn("POSTAL_CODE", _categories("address S123456", ["SG"]))
+        # Must NOT fire on the leading 6 digits of an NRIC.
+        self.assertNotIn("POSTAL_CODE", _categories("ic S1234567D", ["SG"]))
+
     def test_locale_filtering(self):
         # SG detectors don't run when only universal locale is requested.
         self.assertNotIn("NRIC/FIN", _categories("ic S0000001I", []))
