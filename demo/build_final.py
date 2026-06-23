@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build the final banner (ingest/banner.py) and demo GIF (demo/demo.gif).
+"""Build the CLI banner (ingest/banner.py) and the README title-card GIF.
 
-Layout: parrot (left) + ansi_shadow "Doppel"/"ganger" (right), amber wordmark,
-tagline centered beneath. Renders the GIF with agg's dracula theme.
+- ingest/banner.py: lean parrot + amber wordmark, printed at CLI startup.
+- demo/demo.gif: a richer "title card" — tagline, parrot + gradient wordmark,
+  a keyword line, a version box, and a made-by line — rendered with agg.
 """
 import json
 import os
@@ -11,12 +12,19 @@ import subprocess
 import pyfiglet
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PY = os.path.join(ROOT, "venv", "bin", "python")
-AGG = os.environ.get("AGG", "agg")  # asciinema agg on PATH; override with $AGG
+AGG = os.environ.get("AGG", "agg")
 GAP = "   "
-TAG = "fine-tune an LLM to write like you"
-CMD = "python -m ingest --source telegram --input demo/sample_export.json"
-AMBER, RESET = "\x1b[1;38;2;242;176;76m", "\x1b[0m"
+
+TAGLINE = "fine-tune an LLM on your chat history to write like you"
+KEYWORDS = "ingest  ·  scan  ·  redact  ·  audit  ·  fine-tune"
+VERSIONS = "Python 3.11–3.13   ·   LLaMA-Factory 0.9.4   ·   local LLM"
+MADEBY = "made by @NotYuSheng"
+
+AMBER = (242, 176, 76)
+GRAD0, GRAD1 = (255, 196, 84), (233, 84, 64)   # gold -> coral, horizontal gradient
+DIM = (140, 140, 150)
+
+RESET = "\x1b[0m"
 
 with open(os.path.join(ROOT, "demo/mascot.txt"), encoding="utf-8") as _f:
     parrot = _f.read().rstrip("\n").split("\n")
@@ -32,11 +40,36 @@ def _fig(t):
 
 word = _fig("Doppel") + _fig("ganger")
 TOP = (len(parrot) - len(word)) // 2
-TOTAL_W = PW + len(GAP) + max(len(l) for l in word)
+WW = max(len(l) for l in word)
+BLOCK_W = PW + len(GAP) + WW
 
 
-def rows(on, off):
-    # Just the mascot + wordmark — the tagline lives in the README as clean text.
+def _solid(rgb, s):
+    return f"\x1b[1;38;2;{rgb[0]};{rgb[1]};{rgb[2]}m{s}{RESET}" if s.strip() else s
+
+
+def _grad(s):
+    out = []
+    for i, ch in enumerate(s):
+        if ch == " ":
+            out.append(ch)
+            continue
+        t = i / max(1, WW - 1)
+        r = round(GRAD0[0] + (GRAD1[0] - GRAD0[0]) * t)
+        g = round(GRAD0[1] + (GRAD1[1] - GRAD0[1]) * t)
+        b = round(GRAD0[2] + (GRAD1[2] - GRAD0[2]) * t)
+        out.append(f"\x1b[1;38;2;{r};{g};{b}m{ch}")
+    return "".join(out) + RESET
+
+
+def _center(plain, rgb=None, width=BLOCK_W):
+    pad = max(0, (width - len(plain)) // 2)
+    body = _solid(rgb, plain) if rgb else plain
+    return " " * pad + body
+
+
+def lean_rows(on, off):
+    """Parrot + wordmark only (for the CLI banner)."""
     r = []
     for i, pl in enumerate(parrot):
         wl = word[i - TOP] if 0 <= i - TOP < len(word) else ""
@@ -45,13 +78,27 @@ def rows(on, off):
     return r
 
 
+def card_rows():
+    """The richer title card (coloured) for the GIF."""
+    rows = ["", _center(TAGLINE, DIM), ""]
+    for i, pl in enumerate(parrot):
+        wl = word[i - TOP] if 0 <= i - TOP < len(word) else ""
+        rows.append(pl.ljust(PW) + GAP + (_grad(wl) if wl else ""))
+    rows += ["", _center(KEYWORDS, AMBER), ""]
+    box = len(VERSIONS) + 2
+    rows.append(_center("┌" + "─" * box + "┐", DIM))
+    rows.append(_center("│ " + VERSIONS + " │", DIM))
+    rows.append(_center("└" + "─" * box + "┘", DIM))
+    rows += ["", _center(MADEBY, DIM)]
+    return rows
+
+
 def write_banner_module():
-    body = "\n".join(rows("<C>", "<R>"))  # sentinels; colourised at runtime
+    body = "\n".join(lean_rows("<C>", "<R>"))
     mod = (
         '"""ASCII startup banner: a parrot in a mirror (it mimics your voice; the\n'
-        'mirror is the doppelganger) beside the wordmark. The wordmark is amber via\n'
-        'truecolor ANSI. Regenerate via demo/build_final.py.\n'
-        'Set DOPPELGANGER_NO_BANNER=1 to silence it."""\n\n'
+        'mirror is the doppelganger) beside the wordmark, in truecolor amber.\n'
+        'Regenerate via demo/build_final.py. DOPPELGANGER_NO_BANNER=1 silences it."""\n\n'
         'import os\n\n'
         '_AMBER = "\\x1b[1;38;2;242;176;76m"  # truecolor amber\n'
         '_RESET = "\\x1b[0m"\n\n'
@@ -61,40 +108,35 @@ def write_banner_module():
         '        return\n'
         '    print(_BANNER.replace("<C>", _AMBER).replace("<R>", _RESET) + "\\n")\n'
     )
-    open(os.path.join(ROOT, "ingest/banner.py"), "w", encoding="utf-8").write(mod)
+    with open(os.path.join(ROOT, "ingest/banner.py"), "w", encoding="utf-8") as f:
+        f.write(mod)
 
 
 def render_gif():
-    env = dict(os.environ, LLM_VALIDATE="false", DOPPELGANGER_NO_BANNER="1")
-    out = subprocess.run([PY, *CMD.split()[1:]], cwd=ROOT, env=env,
-                         capture_output=True, text=True, check=True)
-    report = ((out.stdout or "") + (out.stderr or "")).split("\n")
-
+    card = card_rows()
     events, t = [], 0.0
     def emit(d, dt):
         nonlocal t
         t += dt
         events.append([round(t, 3), "o", d])
-    emit("\x1b[32m$\x1b[0m ", 0.3)
-    for ch in CMD:
-        emit(ch, 0.026)
-    emit("\r\n", 0.5)
-    for line in rows(AMBER, RESET) + report:
-        emit(line + "\r\n", 0.05)
-    emit("\x1b[32m$\x1b[0m ", 1.6)
+    emit("\x1b[?25l", 0.2)            # hide cursor
+    for line in card:
+        emit(line + "\r\n", 0.08)
+    emit("", 2.4)                     # hold on the finished card
 
     cast = os.path.join(ROOT, "demo/demo.cast")
     with open(cast, "w", encoding="utf-8") as f:
-        f.write(json.dumps({"version": 2, "width": 94, "height": 34}) + "\n")
+        f.write(json.dumps({"version": 2, "width": BLOCK_W + 6, "height": len(card) + 2}) + "\n")
         for ev in events:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
-    subprocess.run([AGG, "--font-size", "18", "--theme", "dracula", cast,
-                    os.path.join(ROOT, "demo/demo.gif")],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=True)
+    subprocess.run(
+        [AGG, "--font-size", "18", "--theme", "dracula", cast,
+         os.path.join(ROOT, "demo/demo.gif")],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, check=True,
+    )
 
 
 if __name__ == "__main__":
     write_banner_module()
     render_gif()
-    print("=== layout preview ===")
-    print("\n".join(rows("", "")))
+    print("\n".join(r for r in card_rows()))
