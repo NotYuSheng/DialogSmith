@@ -157,10 +157,16 @@ class LlmRedactionTest(unittest.TestCase):
         out = redactor.apply(self._samples(), "replace", llm_findings=llm)
         self.assertEqual(out[0][0]["text"], "hi I'm [NAME] from Acme")
 
-    def test_replace_spans_drops_overlap(self):
+    def test_replace_spans_prefers_outer_span(self):
         from ingest.redactor import _replace_spans
-        # Two overlapping spans -> only the right-most is applied.
-        self.assertEqual(_replace_spans("abcdef", [(0, 3, "X"), (2, 5, "Y")]), "ab[Y]f")
+        # Partial overlap -> keep the earlier/outer span, one clean replacement.
+        self.assertEqual(_replace_spans("abcdef", [(0, 3, "X"), (2, 5, "Y")]), "[X]def")
+        # Nested: the inner span must not survive while its enclosing span is
+        # dropped (which would leave the uncovered prefix exposed).
+        self.assertEqual(
+            _replace_spans("a@b.com x", [(0, 7, "EMAIL"), (2, 7, "DOMAIN")]),
+            "[EMAIL] x",
+        )
 
 
 if __name__ == "__main__":

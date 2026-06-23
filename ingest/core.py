@@ -154,7 +154,6 @@ def _assemble_turns(raw_turns, multi_speaker: bool) -> Sample:
 
     for sender_id, is_self, text in raw_turns:
         role = "assistant" if is_self else "user"
-        value = f"{sender_id}: {text}" if (multi_speaker and role == "user") else text
 
         same_role = bool(turns) and turns[-1]["role"] == role
         # In multi-speaker mode a user turn only merges with the previous turn
@@ -163,8 +162,10 @@ def _assemble_turns(raw_turns, multi_speaker: bool) -> Sample:
             multi_speaker and role == "user" and last_sender != sender_id
         )
         if mergeable:
-            turns[-1]["text"] += "\n" + value
+            # Continuation of the same turn — don't repeat the speaker prefix.
+            turns[-1]["text"] += "\n" + text
         else:
+            value = f"{sender_id}: {text}" if (multi_speaker and role == "user") else text
             turns.append({"role": role, "text": value})
         last_sender = sender_id
 

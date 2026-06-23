@@ -21,6 +21,7 @@ from typing import Iterable, List, Optional
 from ingest import redaction
 
 DEFAULT_LOCALES = ["SG"]  # universal detectors always run in addition to these
+_MAX_CONSECUTIVE_LLM_FAILURES = 5  # abort the LLM pass if the endpoint keeps failing
 
 
 def scan_samples(samples, locales: Optional[Iterable[str]] = None) -> dict:
@@ -92,16 +93,18 @@ def print_summary(report: dict, report_path: str, mode: str = "off") -> None:
 def _replace_spans(text: str, spans) -> str:
     """Replace ``(start, end, category)`` spans with ``[CATEGORY]`` placeholders.
 
-    Drops overlapping spans (keeping the right-most) and replaces right-to-left
-    so each replacement leaves earlier offsets valid.
+    On overlap, keep the longer/outermost span — so an inner ``DOMAIN`` can't
+    survive while its enclosing ``EMAIL`` is dropped, which would leave the email
+    username exposed. Sort by start ascending then end descending, greedily keep
+    non-overlapping spans, and apply right-to-left so earlier offsets stay valid.
     """
     chosen = []
-    boundary = len(text) + 1  # left edge of the span accepted to our right
-    for start, end, cat in sorted(set(spans), key=lambda s: -s[0]):
-        if end <= boundary:
+    last_end = 0
+    for start, end, cat in sorted(set(spans), key=lambda s: (s[0], -s[1])):
+        if start >= last_end:
             chosen.append((start, end, cat))
-            boundary = start
-    for start, end, cat in chosen:  # already right-to-left
+            last_end = end
+    for start, end, cat in reversed(chosen):
         text = text[:start] + f"[{cat}]" + text[end:]
     return text
 
@@ -195,11 +198,17 @@ def llm_scan_samples(samples, client, model) -> List[dict]:
     rather than trusting an offset we can't confirm.
     """
     findings = []
+    consecutive_failures = 0
     for ci, turns in enumerate(samples):
         try:
             raw = _llm_audit_conversation(client, model, turns)
+            consecutive_failures = 0
         except Exception as e:
+            consecutive_failures += 1
             print(f"[redactor] LLM scan failed on conversation {ci}: {e}")
+            if consecutive_failures >= _MAX_CONSECUTIVE_LLM_FAILURES:
+                print("[redactor] Too many consecutive LLM failures — aborting LLM scan.")
+                break
             continue
         for rf in raw:
             try:

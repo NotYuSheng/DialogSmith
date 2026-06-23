@@ -25,6 +25,7 @@ import re
 
 from ingest import llm
 
+_MAX_CONSECUTIVE_LLM_FAILURES = 5  # abort validation if the endpoint keeps failing
 COHERENCE_THRESHOLD = 0.5   # below this the conversation is considered incoherent
 QUALITY_THRESHOLD = 0.5     # below this the sample is considered low-quality
 PAIRING_THRESHOLD = 0.5     # below this the turns don't respond to each other
@@ -135,13 +136,20 @@ def validate_samples(samples):
     passed = []
     filtered = []
     split_count = 0
+    consecutive_failures = 0
 
     for i, turns in enumerate(samples):
         try:
             r = _score_sample(client, model, turns)
+            consecutive_failures = 0
         except Exception as e:
+            consecutive_failures += 1
             print(f"[validator] Sample {i}: scoring failed ({e}), keeping sample.")
             passed.append(turns)
+            if consecutive_failures >= _MAX_CONSECUTIVE_LLM_FAILURES:
+                print("[validator] Too many consecutive LLM failures — keeping remaining samples unvalidated.")
+                passed.extend(samples[i + 1:])
+                break
             continue
 
         low = (
