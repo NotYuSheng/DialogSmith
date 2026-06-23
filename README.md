@@ -1,6 +1,6 @@
-# DialogSmith – Fine-Tune Models on Your Telegram History
+# Doppelganger – Fine-Tune Models on Your Telegram History
 
-**DialogSmith** lets you fine-tune large language models (LLMs) like Qwen on your own Telegram conversations.
+**Doppelganger** lets you fine-tune large language models (LLMs) like Qwen on your own Telegram conversations.
 Built on top of [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), it automatically formats data into the ShareGPT format for supervised fine-tuning (SFT).
 
 ## Purpose
@@ -55,7 +55,7 @@ To deliberately commit a blocked file, bypass the hook with `git commit --no-ver
 5. Place the exported `result.json` file into:
 
 ```
-DialogSmith/
+Doppelganger/
 ├── data/
 │   └── result.json  ← Place here
 ```
@@ -201,7 +201,7 @@ venv\Scripts\activate
 You should see the prompt change to show that the environment is active:
 
 ```
-(venv) C:\Users\yourname\DialogSmith>
+(venv) C:\Users\yourname\Doppelganger>
 ```
 
 Once activated, you can run `python`, `pip`, or training commands as usual.
