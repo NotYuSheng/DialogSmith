@@ -294,7 +294,7 @@ It runs in well under a second and locks in the conversion behaviour, so you can
 
 ## Legacy Workflow
 
-The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is preserved at the [`v0.1.0`](https://github.com/NotYuSheng/Doppelganger/releases/tag/v0.1.0) tag. The old `scripts/telegram_extract.py` and `scripts/convert_to_sharegpt.py` still work as thin deprecated wrappers around `python -m ingest`, but will be removed in a future release.
+The pre-refactor, Windows-only workflow (which cloned LLaMA-Factory at HEAD) is preserved at the [`v0.1.0`](https://github.com/NotYuSheng/Doppelganger/releases/tag/v0.1.0) tag. The old `scripts/telegram_extract.py` and `scripts/convert_to_sharegpt.py` shims have been removed — use `python -m ingest` instead.
 
 ## Star History
 
