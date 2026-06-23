@@ -1,27 +1,28 @@
-<div align="center">
+<h1 align="center">Doppelganger</h1>
 
-<img src="demo/demo.gif" alt="Doppelganger CLI — ingest a chat export and scan it for sensitive data before training" width="820">
-
-# Doppelganger
-
-**Fine-tune an LLM on your own chat history to mimic how you write**
-
-<a href="#features">Features</a> •
-<a href="#quick-start">Quick Start</a> •
-<a href="#usage">Usage</a> •
-<a href="#fine-tune-your-model-lora">Fine-Tuning</a> •
-<a href="#privacy--sensitive-data">Privacy</a>
-
-<p>
-  <img src="https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
-  <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch"/>
-  <img src="https://img.shields.io/badge/LLaMA--Factory-0.9.4-FF6F00?style=for-the-badge" alt="LLaMA-Factory"/>
-  <img src="https://img.shields.io/badge/Local%20LLM-OpenAI--compatible-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI-compatible"/>
-  <img src="https://img.shields.io/github/stars/NotYuSheng/Doppelganger?style=for-the-badge&logo=github&color=gold" alt="Stars"/>
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"/>
+<p align="center">
+  <strong>Fine-tune an LLM on your own chat history to mimic how you write</strong>
 </p>
 
-</div>
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#fine-tune-your-model-lora">Fine-Tuning</a> •
+  <a href="#privacy--sensitive-data">Privacy</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11--3.13-3776AB?style=flat&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/LLaMA--Factory-0.9.4-FF6F00?style=flat" alt="LLaMA-Factory"/>
+  <img src="https://img.shields.io/badge/OpenAI--compatible-LLM-412991?style=flat&logo=openai&logoColor=white" alt="OpenAI-compatible"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License: MIT"/>
+</p>
+
+<p align="center">
+  <img src="demo/demo.gif" alt="Doppelganger CLI: ingest a chat export and scan it for sensitive data before training" width="760">
+</p>
 
 ---
 

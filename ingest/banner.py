@@ -1,7 +1,6 @@
 """ASCII startup banner: a parrot in a mirror (it mimics your voice; the
-mirror is the doppelganger) beside the wordmark. The wordmark is amber via
-truecolor ANSI. Regenerate via demo/build_final.py.
-Set DOPPELGANGER_NO_BANNER=1 to silence it."""
+mirror is the doppelganger) beside the wordmark, in truecolor amber.
+Regenerate via demo/build_final.py. DOPPELGANGER_NO_BANNER=1 silences it."""
 
 import os
 
