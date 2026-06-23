@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ingest import core, sharegpt
 from ingest.adapters import available_sources, get_adapter
 from ingest.adapters.telegram import TelegramAdapter
+from ingest.message import NormalizedMessage
 
 SELF = "Yu Sheng"
 
@@ -117,6 +118,21 @@ class TelegramAdapterTest(unittest.TestCase):
         alice = [m for m in msgs if m.sender_id == "Alice"][0]
         self.assertTrue(alice.sender_is_self)
 
+    def test_missing_from_becomes_unknown(self):
+        # "from" can be missing/None (anonymous channel posts); sender_id must
+        # stay a str rather than None.
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "result.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"personal_information": {"first_name": "Yu", "last_name": "Sheng"},
+                           "chats": {"list": [{"id": 1, "messages": [
+                               _msg(None, 100, "anon post"),
+                               _msg(SELF, 110, "reply")]}]}}, f)
+            msgs = TelegramAdapter().parse(path)
+            anon = [m for m in msgs if m.timestamp == 100][0]
+            self.assertEqual(anon.sender_id, "Unknown")
+            self.assertFalse(anon.sender_is_self)
+
     def test_undetectable_self_name_raises(self):
         # Without personal_information, auto-detection yields "" — which would
         # silently drop every conversation. Must fail loudly instead.
@@ -148,6 +164,57 @@ class CoreTest(unittest.TestCase):
         self.assertEqual(first_two, EXPECTED_SHAREGPT[:2])
 
 
+def _nm(chat, ts, sender, is_self, text, mid=None, reply=None):
+    return NormalizedMessage(
+        chat_id=chat, timestamp=ts, sender_id=sender, sender_is_self=is_self,
+        text=text, message_id=mid, reply_to_id=reply,
+    )
+
+
+class ReplyThreadingTest(unittest.TestCase):
+    def test_reply_stitches_gap_split_conversations(self):
+        # Two messages an hour+ apart would split into two conversations, but the
+        # second replies to the first -> they must end up in one sample.
+        msgs = [
+            _nm("c", 1000, "Alice", False, "you free this weekend?", mid="1"),
+            _nm("c", 1000 + 8000, "Yu", True, "yeah sun works", mid="2", reply="1"),
+        ]
+        samples = core.build_samples(msgs)
+        self.assertEqual(len(samples), 1)
+        self.assertEqual([t["role"] for t in samples[0]], ["user", "assistant"])
+
+    def test_no_reply_data_keeps_time_split(self):
+        # Same timing, no reply link -> still two conversations (one is one-sided
+        # and dropped), proving threading is a no-op without reply metadata.
+        msgs = [
+            _nm("c", 1000, "Alice", False, "you free this weekend?"),
+            _nm("c", 1000 + 8000, "Yu", True, "yeah sun works"),
+        ]
+        self.assertEqual(core.build_samples(msgs), [])
+
+
+class MultiSpeakerTest(unittest.TestCase):
+    def _group(self):
+        return [
+            _nm("g", 1, "Bob", False, "q1"),
+            _nm("g", 2, "Carol", False, "q2"),
+            _nm("g", 3, "Yu", True, "answer"),
+        ]
+
+    def test_default_collapses_other_side(self):
+        out = sharegpt.to_sharegpt(core.build_samples(self._group()))
+        self.assertEqual(out[0]["conversations"][0], {"from": "human", "value": "q1\nq2"})
+
+    def test_multi_speaker_labels_users_not_assistant(self):
+        out = sharegpt.to_sharegpt(core.build_samples(self._group(), multi_speaker=True))
+        convs = out[0]["conversations"]
+        # Distinct speakers stay distinct and are labelled...
+        self.assertEqual(convs[0], {"from": "human", "value": "Bob: q1"})
+        self.assertEqual(convs[1], {"from": "human", "value": "Carol: q2"})
+        # ...but the owner's (assistant) turn is never labelled.
+        self.assertEqual(convs[2], {"from": "gpt", "value": "answer"})
+
+
 class ShareGptTest(unittest.TestCase):
     def test_role_mapping_and_drop_one_sided(self):
         samples = [
@@ -167,6 +234,58 @@ class ShareGptTest(unittest.TestCase):
             self.assertEqual(sharegpt.load_jsonl_samples(p), samples)
 
 
+class ValidatorSplitTest(unittest.TestCase):
+    def test_apply_split_cuts_after_indices(self):
+        from ingest.validator import _apply_split
+        turns = [{"role": "user", "text": "a"}, {"role": "assistant", "text": "b"},
+                 {"role": "user", "text": "c"}, {"role": "assistant", "text": "d"}]
+        pieces = _apply_split(turns, [1])
+        self.assertEqual(len(pieces), 2)
+        self.assertEqual(pieces[0], turns[:2])
+        self.assertEqual(pieces[1], turns[2:])
+
+    def test_apply_split_ignores_out_of_range(self):
+        from ingest.validator import _apply_split
+        turns = [{"role": "user", "text": "a"}, {"role": "assistant", "text": "b"}]
+        # Index at/after the last turn is meaningless -> no split.
+        self.assertEqual(_apply_split(turns, [1, 9]), [turns])
+
+    def test_has_both_roles(self):
+        from ingest.validator import _has_both_roles
+        self.assertTrue(_has_both_roles([{"role": "user"}, {"role": "assistant"}]))
+        self.assertFalse(_has_both_roles([{"role": "user"}, {"role": "user"}]))
+
+
+class _FakeOpenAI:
+    """Stub OpenAI-compatible client returning canned JSON (no network)."""
+    def __init__(self, text):
+        import types
+        msg = types.SimpleNamespace(content=text)
+        resp = types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+        self.chat = types.SimpleNamespace(
+            completions=types.SimpleNamespace(create=lambda **kw: resp))
+
+
+class ValidatorSplitPriorityTest(unittest.TestCase):
+    def test_split_runs_even_when_scores_are_low(self):
+        from ingest import validator, llm
+        canned = ('{"coherence":0.2,"quality":0.2,"pairing":0.2,'
+                  '"action":"split","split_after":[1],"reason":"two convos"}')
+        orig_get, orig_should = llm.get_client, llm.should_validate
+        llm.get_client = lambda: _FakeOpenAI(canned)
+        llm.should_validate = lambda: True
+        os.environ["LLM_MODEL"] = "x"
+        try:
+            sample = [{"role": "user", "text": "a"}, {"role": "assistant", "text": "b"},
+                      {"role": "user", "text": "c"}, {"role": "assistant", "text": "d"}]
+            out = validator.validate_samples([sample])
+            # Low scores would previously drop it; now split runs first -> 2 pieces.
+            self.assertEqual(len(out), 2)
+        finally:
+            llm.get_client, llm.should_validate = orig_get, orig_should
+            os.environ.pop("LLM_MODEL", None)
+
+
 class RegistryTest(unittest.TestCase):
     def test_telegram_registered(self):
         self.assertIn("telegram", available_sources())
@@ -180,7 +299,7 @@ class RegistryTest(unittest.TestCase):
 class CliTest(unittest.TestCase):
     def test_end_to_end_sharegpt(self):
         from ingest.cli import main
-        os.environ["DIALOGSMITH_LLM_VALIDATE"] = "false"  # no API calls
+        os.environ["LLM_VALIDATE"] = "false"  # no API calls
         with tempfile.TemporaryDirectory() as d:
             inp = _write_fixture(d)
             out = os.path.join(d, "chat_sharegpt.json")
@@ -192,6 +311,25 @@ class CliTest(unittest.TestCase):
     def test_unknown_source_exit_code(self):
         from ingest.cli import main
         self.assertEqual(main(["--source", "nope"]), 2)
+
+    def test_redact_applies_even_when_scan_skipped(self):
+        # --redact must still redact when the scan is skipped (no silent leak).
+        from ingest.cli import main
+        os.environ["LLM_VALIDATE"] = "false"
+        with tempfile.TemporaryDirectory() as d:
+            inp = os.path.join(d, "result.json")
+            with open(inp, "w", encoding="utf-8") as f:
+                json.dump({"personal_information": {"first_name": "Yu", "last_name": "Sheng"},
+                           "chats": {"list": [{"id": 1, "messages": [
+                               _msg("Alice", 100, "mail me at a@b.com"),
+                               _msg(SELF, 110, "ok")]}]}}, f)
+            out = os.path.join(d, "out.json")
+            rc = main(["--source", "telegram", "--input", inp, "--output", out,
+                       "--skip-redact-scan", "--redact", "replace"])
+            self.assertEqual(rc, 0)
+            blob = json.dumps(json.load(open(out, encoding="utf-8")))
+            self.assertIn("[EMAIL]", blob)
+            self.assertNotIn("a@b.com", blob)
 
 
 if __name__ == "__main__":

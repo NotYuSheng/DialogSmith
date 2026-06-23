@@ -6,6 +6,7 @@ llamafactory==0.9.4
 # (see https://pytorch.org/get-started/locally/). Installing llamafactory pulls
 # a torch build, but it may not match your CUDA version.
 
-# Optional — only needed when LLM-based dataset validation is enabled
-# (DIALOGSMITH_LLM_VALIDATE / ANTHROPIC_API_KEY). Safe to remove otherwise.
-anthropic>=0.39
+# Optional — only needed for the LLM features (quality validation, LLM
+# redaction). Uses the OpenAI-compatible API, so it works with OpenAI or any
+# local server (Ollama, vLLM, LM Studio, ...). Safe to remove otherwise.
+openai>=1.0

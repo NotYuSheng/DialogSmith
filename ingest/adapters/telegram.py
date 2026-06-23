@@ -64,7 +64,12 @@ class TelegramAdapter:
             for msg in chat.get("messages", []):
                 if not _is_valid(msg):
                     continue
-                sender = msg.get("from")
+                # "from" can be missing/None (e.g. anonymous channel posts); fall
+                # back to a label so sender_id stays a str (and multi-speaker
+                # mode doesn't emit a "None: " prefix).
+                sender = msg.get("from") or "Unknown"
+                reply_to = msg.get("reply_to_message_id")
+                msg_id = msg.get("id")
                 messages.append(
                     NormalizedMessage(
                         chat_id=chat_id,
@@ -72,6 +77,8 @@ class TelegramAdapter:
                         sender_id=sender,
                         sender_is_self=(sender == self_name),
                         text=_get_text(msg),
+                        message_id=str(msg_id) if msg_id is not None else None,
+                        reply_to_id=str(reply_to) if reply_to is not None else None,
                     )
                 )
         return messages

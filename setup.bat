@@ -19,8 +19,8 @@ if errorlevel 1 (echo Failed to install dependencies. & exit /b 1)
 
 echo [3/4] Preparing .env...
 if not exist ".env" (
-    copy ".env.example" ".env" >nul
-    echo       Created .env from .env.example - edit it to enable optional LLM validation.
+    copy "example.env" ".env" >nul
+    echo       Created .env from example.env - edit it to enable optional LLM features.
 )
 
 echo [4/4] Processing Telegram export (data\result.json -^> data\chat_sharegpt.json)...
