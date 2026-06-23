@@ -1,0 +1,22 @@
+{
+  "personal_information": { "first_name": "Alex", "last_name": "Tan" },
+  "chats": {
+    "list": [
+      {
+        "id": 4815162342,
+        "messages": [
+          { "type": "message", "id": 1, "from": "Jamie", "date_unixtime": "1700000000", "text": "yo did you book the airbnb for the trip?" },
+          { "type": "message", "id": 2, "from": "Alex Tan", "date_unixtime": "1700000035", "text": "yeah just sorted it! i'll forward you the invoice" },
+          { "type": "message", "id": 3, "from": "Jamie", "date_unixtime": "1700000070", "text": "nice send it to jamie.wong@gmail.com" },
+          { "type": "message", "id": 4, "from": "Alex Tan", "date_unixtime": "1700000110", "text": "done. they need your details for check-in too" },
+          { "type": "message", "id": 5, "from": "Jamie", "date_unixtime": "1700000150", "text": "ok my number is 8123 4567 and nric S1234567D" },
+          { "type": "message", "id": 6, "from": "Alex Tan", "date_unixtime": "1700000190", "text": "got it. i already paid the deposit with card 4111 1111 1111 1111" },
+          { "type": "message", "id": 7, "from": "Jamie", "date_unixtime": "1700000215", "text": "lmao did you just type your full card number" },
+          { "type": "message", "id": 8, "from": "Alex Tan", "date_unixtime": "1700000245", "text": "haha oops. anyway i'll send the confirmation to alex.tan@example.com" },
+          { "type": "message", "id": 9, "from": "Jamie", "date_unixtime": "1700000275", "text": "perfect, see you next week!" },
+          { "type": "message", "id": 10, "from": "Alex Tan", "date_unixtime": "1700000300", "text": "see ya, can't wait" }
+        ]
+      }
+    ]
+  }
+}

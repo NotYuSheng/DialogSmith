@@ -20,6 +20,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License: MIT"/>
 </p>
 
+<p align="center">
+  <img src="demo/demo.gif" alt="Doppelganger CLI: ingest a chat export and scan it for sensitive data before training" width="760">
+</p>
+
 ---
 
 Doppelganger fine-tunes large language models (like Qwen) on your own chat conversations, capturing how *you* write. Built on top of [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory), it turns a raw chat export into a [ShareGPT](https://github.com/hiyouga/LLaMA-Factory/blob/main/data/README.md)-formatted dataset for supervised fine-tuning (SFT), then trains a LoRA adapter on it.

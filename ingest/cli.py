@@ -176,6 +176,9 @@ def main(argv=None) -> int:
     _load_dotenv()
     args = build_parser().parse_args(argv)
 
+    from ingest import banner
+    banner.print_banner()
+
     try:
         adapter = get_adapter(args.source)
     except ValueError as e:
