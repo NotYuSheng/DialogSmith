@@ -36,13 +36,12 @@ TOTAL_W = PW + len(GAP) + max(len(l) for l in word)
 
 
 def rows(on, off):
+    # Just the mascot + wordmark — the tagline lives in the README as clean text.
     r = []
     for i, pl in enumerate(parrot):
         wl = word[i - TOP] if 0 <= i - TOP < len(word) else ""
         wl = f"{on}{wl}{off}" if wl else ""
         r.append((pl.ljust(PW) + GAP + wl).rstrip())
-    r.append("")
-    r.append(TAG.center(TOTAL_W).rstrip())  # tagline centred under the whole logo
     return r
 
 
