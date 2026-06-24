@@ -112,11 +112,10 @@ def render_gif():
         nonlocal t
         t += dt
         events.append([round(t, 3), "o", d])
-    emit("\x1b[?25l", 0.2)            # hide cursor
+    emit("\x1b[?25l", 0.0)            # hide cursor from the first frame (no pointer in the GIF)
     for line in card:
         emit(line + "\r\n", 0.08)
     emit("", 2.4)                     # hold on the finished card
-    emit("\x1b[?25h", 0.0)            # restore cursor
 
     cast = os.path.join(ROOT, "demo/demo.cast")
     with open(cast, "w", encoding="utf-8") as f:
