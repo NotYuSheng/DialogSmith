@@ -53,6 +53,7 @@ Rel(redactor, validator, "Redacted samples")
 Rel(validator, formatter, "Kept samples")
 Rel(formatter, dataset, "Writes chat_sharegpt.json")
 Rel(validator, llm, "Scores samples (optional)", "HTTPS")
+Rel(redactor, llm, "LLM-assisted redaction --llm-redact (optional)", "HTTPS")
 
 Rel(user, trainer, "Launches LoRA training")
 Rel(trainer, dataset, "Reads training data")
