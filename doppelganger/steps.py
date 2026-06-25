@@ -71,9 +71,12 @@ def dataset_size() -> int:
 
 
 def effective_batch(cfg: dict, num_gpus: int = 1) -> int:
-    return (int(cfg.get("per_device_train_batch_size", 1))
-            * int(cfg.get("gradient_accumulation_steps", 1))
-            * max(1, num_gpus))
+    def _int(key: str) -> int:
+        try:
+            return int(cfg.get(key) or 1)
+        except (TypeError, ValueError):
+            return 1
+    return _int("per_device_train_batch_size") * _int("gradient_accumulation_steps") * max(1, num_gpus)
 
 
 def recommend_epochs(n_samples: int, eff_batch: int) -> Tuple[int, int, List[str]]:
@@ -231,7 +234,7 @@ def audit(
         cfg = _read_yaml(train_config())
         rec, spe, _ = recommend_epochs(written, effective_batch(cfg))
         print(f"Next: run `train` (recommended ~{rec} epoch(s) for {written} samples).")
-    except OSError:
+    except Exception:  # missing/malformed config or PyYAML — the hint is optional
         print("Next: run `train`.")
     return 0
 
@@ -264,18 +267,31 @@ def train(config: Optional[str] = None, gpus: Optional[str] = None,
     if not os.path.exists(cfg_path):
         print(f"error: training config not found: {cfg_path}")
         return 1
-    cfg = _read_yaml(cfg_path)
+    try:
+        cfg = _read_yaml(cfg_path)
+    except Exception as e:  # malformed YAML or PyYAML not installed
+        print(f"error: failed to read training config: {e}")
+        return 1
     num_gpus = len(gpus.split(",")) if gpus else 1
     recommended = _advise_epochs(cfg, num_gpus)
 
+    # An overridden epoch count goes through a throwaway temp config we clean up.
+    temp_cfg = None
     if epochs == "auto":
-        cfg_path = _config_with_epochs(cfg_path, recommended)
+        cfg_path = temp_cfg = _config_with_epochs(cfg_path, recommended)
         print(f"[advisor] --epochs auto → training for {recommended} epoch(s).")
     elif epochs is not None:
-        cfg_path = _config_with_epochs(cfg_path, float(epochs))
+        cfg_path = temp_cfg = _config_with_epochs(cfg_path, float(epochs))
         print(f"[advisor] --epochs {epochs} → overriding config.")
 
-    return _llamafactory(["train", cfg_path], gpus=gpus)
+    try:
+        return _llamafactory(["train", cfg_path], gpus=gpus)
+    finally:
+        if temp_cfg and os.path.exists(temp_cfg):
+            try:
+                os.remove(temp_cfg)
+            except OSError:
+                pass
 
 
 def merge(config: Optional[str] = None, gpus: Optional[str] = None) -> int:
