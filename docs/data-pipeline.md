@@ -94,8 +94,8 @@ so you can review it before training. See [privacy](#privacy-notes).
   pluggable country ID packs (`--redact-locales`, default `SG`). Universal
   patterns always run.
 - **Writes `data/redaction_report.json`** — every finding with `conversation`,
-  `turn`, `role`, `category`, `detector`, `severity`, masked `preview`, and the
-  raw `value`. A summary table is printed to the terminal.
+  `turn`, `role`, `category`, `detector`, `severity`, and a masked `preview`.
+  A summary table is printed to the terminal.
 - **Optional LLM redaction** (`--llm-redact`): an OpenAI-compatible model flags
   context-dependent PII (names, secrets) that regex misses. **Local-first** —
   it refuses a hosted API unless `--allow-cloud-redaction` is set, so chat text

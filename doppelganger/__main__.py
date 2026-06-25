@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--gpus", default=None, help="CUDA_VISIBLE_DEVICES.")
 
     c = sub.add_parser("chat", help="Chat with the fine-tuned model.")
+    c.add_argument("--config", default=None, help="Training config (default: configs/train_lora[.local].yaml).")
     c.add_argument("--gpus", default=None, help="CUDA_VISIBLE_DEVICES, e.g. '0'.")
 
     au = sub.add_parser("auto", help="Run parse → audit end-to-end (optionally → train).")
@@ -95,7 +96,7 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "merge":
         return steps.merge(config=args.config, gpus=args.gpus)
     if args.command == "chat":
-        return steps.chat(gpus=args.gpus)
+        return steps.chat(config=args.config, gpus=args.gpus)
     if args.command == "auto":
         return steps.auto(
             do_train=args.do_train, redact=args.redact, gpus=args.gpus,
@@ -115,7 +116,14 @@ def _menu() -> int:
             mark = "✓" if done() else " "
             print(f"  [{mark}] {i}. {name:6} — {desc}")
         print("      a. auto   — run parse → audit end-to-end")
-        choice = input("> ").strip().lower()
+        try:
+            choice = input("> ").strip().lower()
+        except EOFError:       # non-interactive stdin
+            print()
+            return 0
+        except KeyboardInterrupt:  # Ctrl-C
+            print()
+            return 130
 
         if choice in ("q", "quit", "exit", ""):
             return 0

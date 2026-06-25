@@ -50,7 +50,7 @@ def adapter_dir() -> Optional[str]:
     """Where training writes the LoRA adapter (``output_dir`` in the config)."""
     try:
         return _read_yaml(train_config()).get("output_dir")
-    except OSError:
+    except Exception:  # missing file, malformed YAML, or PyYAML not installed
         return None
 
 
@@ -169,7 +169,11 @@ def parse(
 
     os.makedirs(DATA_DIR, exist_ok=True)
     print(f"Loading {input_path} via '{source}' adapter...")
-    messages = get_adapter(source).parse(input_path, self_name=self_name)
+    try:
+        messages = get_adapter(source).parse(input_path, self_name=self_name)
+    except Exception as e:  # malformed export, bad permissions, self-name detection failure
+        print(f"error: failed to parse export: {e}")
+        return 1
 
     print("Building conversation samples...")
     samples = core.build_samples(
@@ -257,6 +261,9 @@ def train(config: Optional[str] = None, gpus: Optional[str] = None,
         return 1
 
     cfg_path = config or train_config()
+    if not os.path.exists(cfg_path):
+        print(f"error: training config not found: {cfg_path}")
+        return 1
     cfg = _read_yaml(cfg_path)
     num_gpus = len(gpus.split(",")) if gpus else 1
     recommended = _advise_epochs(cfg, num_gpus)
@@ -273,12 +280,28 @@ def train(config: Optional[str] = None, gpus: Optional[str] = None,
 
 def merge(config: Optional[str] = None, gpus: Optional[str] = None) -> int:
     """Stage 4 (optional): merge the LoRA adapter into the base model."""
-    return _llamafactory(["export", config or export_config()], gpus=gpus)
+    cfg_path = config or export_config()
+    if not os.path.exists(cfg_path):
+        print(f"error: export config not found: {cfg_path}")
+        return 1
+    return _llamafactory(["export", cfg_path], gpus=gpus)
 
 
-def chat(gpus: Optional[str] = None) -> int:
-    """Stage 5: chat with the fine-tuned model (base + adapter, nothing merged)."""
-    cfg = _read_yaml(train_config())
+def chat(config: Optional[str] = None, gpus: Optional[str] = None) -> int:
+    """Stage 5: chat with the fine-tuned model (base + adapter, nothing merged).
+
+    Uses the same training ``config`` as :func:`train` so a custom ``--config``
+    run points at the right adapter / model / template.
+    """
+    cfg_path = config or train_config()
+    if not os.path.exists(cfg_path):
+        print(f"error: training config not found: {cfg_path}")
+        return 1
+    try:
+        cfg = _read_yaml(cfg_path)
+    except Exception as e:  # malformed YAML or PyYAML not installed
+        print(f"error: failed to read training config: {e}")
+        return 1
     out = cfg.get("output_dir")
     if not out or not os.path.exists(os.path.join(out, "adapter_model.safetensors")):
         print(f"warning: no trained adapter at {out!r} — run `train` first.")
