@@ -82,6 +82,8 @@ Doppelganger/
     └── result.json   ← place your export here
 ```
 
+> **Note:** Telegram exports unzip to a dated folder like `DataExport_2025-07-09/result.json`. Move (or copy) that `result.json` to `data/result.json` — `setup.sh` looks for it there. Alternatively, point `python -m ingest` at the file directly with `--input path/to/result.json`.
+
 **2. Clone and run setup**
 
 The setup scripts create a virtual environment, install pinned dependencies (LLaMA-Factory **0.9.4**), create your `.env`, and process the export into `data/chat_sharegpt.json`.
@@ -122,6 +124,8 @@ LLM_API_KEY=local                             # local servers accept any value
 source venv/bin/activate
 llamafactory-cli train configs/train_lora.yaml
 ```
+
+> **Note:** The tracked `train_lora.yaml` defaults to the small **Qwen1.5-1.8B-Chat** so this step runs fast as an end-to-end smoke test. It's a real model but too small to convincingly mimic your writing — for real results, switch to a larger base (e.g. Qwen2.5-14B-Instruct) via a local override. See [Fine-Tune Your Model](#fine-tune-your-model-lora).
 
 ## Usage
 

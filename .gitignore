@@ -1,6 +1,7 @@
 /venv
 *.json
 *.jsonl
+*.csv
 /saves
 /LLaMA-Factory
 /merged

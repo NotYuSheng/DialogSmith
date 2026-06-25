@@ -16,11 +16,45 @@ ROLE_MAP = {
 }
 
 
+def _coerce_alternating(conversations: list) -> list:
+    """Coerce a ``{"from", "value"}`` turn list into the shape LLaMA-Factory's
+    ShareGPT converter accepts: starts with ``human``, strictly alternates
+    ``human``/``gpt``, and ends with ``gpt`` (even number of turns).
+
+    LLaMA-Factory enforces ``messages[i]`` is human for even ``i`` and gpt for
+    odd ``i``, and rejects odd-length conversations outright. Raw chats break
+    both rules constantly (the other person messages first; same-speaker runs
+    survive reply-stitching / multi-speaker labelling), so without this they are
+    silently dropped at train time. We salvage them instead of discarding:
+
+    - merge consecutive same-speaker turns (labels stay embedded in the text),
+    - drop leading ``gpt`` turns so it starts on ``human``,
+    - drop the trailing ``human`` turn so it ends on ``gpt``.
+
+    Returns ``[]`` if no ``human -> gpt`` pair survives.
+    """
+    merged: list = []
+    for turn in conversations:
+        if merged and merged[-1]["from"] == turn["from"]:
+            merged[-1]["value"] = f"{merged[-1]['value']}\n{turn['value']}"
+        else:
+            merged.append(dict(turn))
+
+    while merged and merged[0]["from"] != "human":
+        merged.pop(0)
+    while merged and merged[-1]["from"] != "gpt":
+        merged.pop()
+
+    return merged if len(merged) >= 2 else []
+
+
 def to_sharegpt(samples: List[Sample]) -> list:
     """Convert role/text samples to ShareGPT ``{"conversations": [...]}`` records.
 
-    Drops empty turns and keeps only samples that contain both a human and a gpt
-    turn (LLaMA-Factory needs both sides to train on).
+    Drops empty turns, then coerces each sample into the strictly-alternating
+    ``human -> gpt -> ...`` shape LLaMA-Factory requires (see
+    :func:`_coerce_alternating`). Samples with no usable ``human -> gpt`` pair
+    are dropped.
     """
     output = []
     for turns in samples:
@@ -31,11 +65,9 @@ def to_sharegpt(samples: List[Sample]) -> list:
             if speaker and value:
                 conversations.append({"from": speaker, "value": value})
 
-        roles_present = {c["from"] for c in conversations}
-        if "human" not in roles_present or "gpt" not in roles_present:
-            continue
-
-        output.append({"conversations": conversations})
+        conversations = _coerce_alternating(conversations)
+        if conversations:
+            output.append({"conversations": conversations})
     return output
 
 

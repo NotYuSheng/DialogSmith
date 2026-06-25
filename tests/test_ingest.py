@@ -78,7 +78,8 @@ EXPECTED_SHAREGPT = [
     {"conversations": [
         {"from": "human", "value": "hey there\nyou around?"},
         {"from": "gpt", "value": "yeah whats up\nstill here"},
-        {"from": "human", "value": "cool"},
+        # trailing human turn ("cool") is trimmed so the sample ends on gpt
+        # (LLaMA-Factory rejects odd-length / trailing-human conversations).
     ]},
     {"conversations": [
         {"from": "human", "value": "later message"},
@@ -208,11 +209,12 @@ class MultiSpeakerTest(unittest.TestCase):
     def test_multi_speaker_labels_users_not_assistant(self):
         out = sharegpt.to_sharegpt(core.build_samples(self._group(), multi_speaker=True))
         convs = out[0]["conversations"]
-        # Distinct speakers stay distinct and are labelled...
-        self.assertEqual(convs[0], {"from": "human", "value": "Bob: q1"})
-        self.assertEqual(convs[1], {"from": "human", "value": "Carol: q2"})
+        # Distinct speakers are labelled, then merged into one human turn so the
+        # conversation alternates human/gpt (LLaMA-Factory rejects consecutive
+        # same-role turns). The labels are preserved in the merged text...
+        self.assertEqual(convs[0], {"from": "human", "value": "Bob: q1\nCarol: q2"})
         # ...but the owner's (assistant) turn is never labelled.
-        self.assertEqual(convs[2], {"from": "gpt", "value": "answer"})
+        self.assertEqual(convs[1], {"from": "gpt", "value": "answer"})
 
 
 class ShareGptTest(unittest.TestCase):
@@ -232,6 +234,77 @@ class ShareGptTest(unittest.TestCase):
             p = os.path.join(d, "out.jsonl")
             sharegpt.write_jsonl(samples, p)
             self.assertEqual(sharegpt.load_jsonl_samples(p), samples)
+
+
+class CoerceAlternatingTest(unittest.TestCase):
+    """LLaMA-Factory requires each conversation to start with human, strictly
+    alternate, and end with gpt. to_sharegpt must coerce raw chats into that
+    shape rather than emit samples that get silently dropped at train time.
+    """
+
+    def _conv(self, samples):
+        return sharegpt.to_sharegpt(samples)[0]["conversations"]
+
+    def test_leading_assistant_turn_is_stripped(self):
+        # The other person messaged first -> drop the leading gpt turn.
+        samples = [[
+            {"role": "assistant", "text": "u there?"},
+            {"role": "user", "text": "ya"},
+            {"role": "assistant", "text": "ok"},
+        ]]
+        self.assertEqual(self._conv(samples), [
+            {"from": "human", "value": "ya"},
+            {"from": "gpt", "value": "ok"},
+        ])
+
+    def test_trailing_user_turn_is_stripped(self):
+        # Conversation ends on a human turn (odd length) -> drop it so it ends gpt.
+        samples = [[
+            {"role": "user", "text": "hi"},
+            {"role": "assistant", "text": "yo"},
+            {"role": "user", "text": "u free?"},
+        ]]
+        self.assertEqual(self._conv(samples), [
+            {"from": "human", "value": "hi"},
+            {"from": "gpt", "value": "yo"},
+        ])
+
+    def test_consecutive_same_role_turns_are_merged(self):
+        # Same-role runs (e.g. from reply-stitching) are merged, not left to
+        # break alternation.
+        samples = [[
+            {"role": "user", "text": "a"},
+            {"role": "user", "text": "b"},
+            {"role": "assistant", "text": "c"},
+            {"role": "assistant", "text": "d"},
+        ]]
+        self.assertEqual(self._conv(samples), [
+            {"from": "human", "value": "a\nb"},
+            {"from": "gpt", "value": "c\nd"},
+        ])
+
+    def test_no_usable_pair_is_dropped(self):
+        # A lone human turn (after trimming) leaves nothing trainable.
+        self.assertEqual(sharegpt.to_sharegpt([[{"role": "user", "text": "hello?"}]]), [])
+
+    def test_output_is_even_length_and_well_formed(self):
+        # Every emitted conversation must start human, end gpt, and alternate.
+        for record in sharegpt.to_sharegpt(EXPECTED_SAMPLES_FOR_SHAPE):
+            convs = record["conversations"]
+            self.assertEqual(len(convs) % 2, 0)
+            self.assertEqual(convs[0]["from"], "human")
+            self.assertEqual(convs[-1]["from"], "gpt")
+            expected = ["human", "gpt"] * (len(convs) // 2)
+            self.assertEqual([c["from"] for c in convs], expected)
+
+
+# Messy inputs that all must come out well-formed.
+EXPECTED_SAMPLES_FOR_SHAPE = [
+    [{"role": "assistant", "text": "first"}, {"role": "user", "text": "u"},
+     {"role": "assistant", "text": "me"}],
+    [{"role": "user", "text": "x"}, {"role": "user", "text": "y"},
+     {"role": "assistant", "text": "z"}, {"role": "user", "text": "trailing"}],
+]
 
 
 class ValidatorSplitTest(unittest.TestCase):
