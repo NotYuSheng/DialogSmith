@@ -61,6 +61,9 @@ def build_parser() -> argparse.ArgumentParser:
     t = sub.add_parser("train", help="LoRA fine-tune on the dataset.")
     t.add_argument("--config", default=None, help="Training config (default: configs/train_lora[.local].yaml).")
     t.add_argument("--gpus", default=None, help="CUDA_VISIBLE_DEVICES, e.g. '0' or '0,1,2,3'.")
+    t.add_argument("--epochs", default=None,
+                   help="Override num_train_epochs: an integer, or 'auto' for the "
+                        "size-based recommendation. Omit to use the config value.")
 
     m = sub.add_parser("merge", help="Merge the LoRA adapter into the base model.")
     m.add_argument("--config", default=None, help="Export config (default: configs/export_lora[.local].yaml).")
@@ -88,7 +91,7 @@ def _dispatch(args: argparse.Namespace) -> int:
         return steps.audit(redact=args.redact, locales=_locales(args.redact_locales),
                            validate=not args.skip_validation)
     if args.command == "train":
-        return steps.train(config=args.config, gpus=args.gpus)
+        return steps.train(config=args.config, gpus=args.gpus, epochs=args.epochs)
     if args.command == "merge":
         return steps.merge(config=args.config, gpus=args.gpus)
     if args.command == "chat":

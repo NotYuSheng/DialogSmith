@@ -5,9 +5,12 @@ Each step is a thin wrapper over existing code: ``parse``/``audit`` reuse the
 Every step returns a process-style exit code (0 = success).
 """
 
+import json
+import math
 import os
 import subprocess
-from typing import List, Optional
+import tempfile
+from typing import List, Optional, Tuple
 
 from ingest import banner, core, redactor, sharegpt
 from ingest.adapters import available_sources, get_adapter
@@ -49,6 +52,81 @@ def adapter_dir() -> Optional[str]:
         return _read_yaml(train_config()).get("output_dir")
     except OSError:
         return None
+
+
+# ── Epoch advisor ─────────────────────────────────────────────────────────────
+# Style-SFT wants roughly this many optimisation steps total — enough to learn
+# the voice, not so many it memorises specific chats.
+_TARGET_STEPS = 300
+_MAX_EPOCHS = 3
+
+
+def dataset_size() -> int:
+    """Number of conversations in the training dataset (0 if not built yet)."""
+    try:
+        with open(DATASET_PATH, encoding="utf-8") as f:
+            return len(json.load(f))
+    except (OSError, ValueError):
+        return 0
+
+
+def effective_batch(cfg: dict, num_gpus: int = 1) -> int:
+    return (int(cfg.get("per_device_train_batch_size", 1))
+            * int(cfg.get("gradient_accumulation_steps", 1))
+            * max(1, num_gpus))
+
+
+def recommend_epochs(n_samples: int, eff_batch: int) -> Tuple[int, int, List[str]]:
+    """Recommend an epoch count from dataset size, plus warnings.
+
+    Targets ~``_TARGET_STEPS`` optimisation steps, but caps epochs low: on small
+    datasets, hitting the step budget would just mean memorising the same few
+    chats, so we cap and warn rather than crank epochs. Returns
+    ``(epochs, steps_per_epoch, warnings)``.
+    """
+    eff_batch = max(1, eff_batch)
+    steps_per_epoch = max(1, math.ceil(n_samples / eff_batch))
+    epochs = max(1, round(_TARGET_STEPS / steps_per_epoch))
+    epochs = min(epochs, _MAX_EPOCHS)
+
+    warnings: List[str] = []
+    if n_samples == 0:
+        warnings.append("no dataset yet — run `parse` + `audit` first.")
+    elif n_samples < 1000:
+        epochs = min(epochs, 2)
+        warnings.append(
+            f"small dataset ({n_samples} samples) — the model will memorise. "
+            "More chats helps far more than more epochs.")
+    elif n_samples >= 10000:
+        epochs = 1
+    return epochs, steps_per_epoch, warnings
+
+
+def _advise_epochs(cfg: dict, num_gpus: int) -> int:
+    """Print an epoch recommendation for the current dataset; return it."""
+    n = dataset_size()
+    eff = effective_batch(cfg, num_gpus)
+    rec, spe, warnings = recommend_epochs(n, eff)
+    print(f"[advisor] Dataset: {n} samples · effective batch {eff} "
+          f"→ {spe} steps/epoch. Recommended: {rec} epoch(s).")
+    configured = cfg.get("num_train_epochs")
+    if configured is not None and abs(float(configured) - rec) >= 1:
+        print(f"[advisor] config sets {configured} epoch(s); recommended {rec}. "
+              f"Pass `--epochs auto` to use {rec}, or `--epochs N` to set your own.")
+    for w in warnings:
+        print(f"[advisor] ⚠️  {w}")
+    return rec
+
+
+def _config_with_epochs(cfg_path: str, epochs: float) -> str:
+    """Write a temp copy of the config with ``num_train_epochs`` overridden."""
+    cfg = _read_yaml(cfg_path)
+    cfg["num_train_epochs"] = float(epochs)
+    import yaml
+    fd, path = tempfile.mkstemp(prefix="train_override_", suffix=".yaml")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False)
+    return path
 
 
 # ── Status (for the menu's checkmarks / out-of-order guards) ──────────────────
@@ -145,7 +223,12 @@ def audit(
 
     written = sharegpt.write_sharegpt(samples, DATASET_PATH)
     print(f"Wrote {written} ShareGPT samples to {DATASET_PATH}.")
-    print("Next: run `train`.")
+    try:
+        cfg = _read_yaml(train_config())
+        rec, spe, _ = recommend_epochs(written, effective_batch(cfg))
+        print(f"Next: run `train` (recommended ~{rec} epoch(s) for {written} samples).")
+    except OSError:
+        print("Next: run `train`.")
     return 0
 
 
@@ -162,12 +245,30 @@ def _llamafactory(args: List[str], gpus: Optional[str] = None) -> int:
         return 127
 
 
-def train(config: Optional[str] = None, gpus: Optional[str] = None) -> int:
-    """Stage 3: LoRA fine-tune via LLaMA-Factory."""
+def train(config: Optional[str] = None, gpus: Optional[str] = None,
+          epochs: Optional[str] = None) -> int:
+    """Stage 3: LoRA fine-tune via LLaMA-Factory.
+
+    ``epochs`` may be ``None`` (use the config value), an integer string, or
+    ``"auto"`` (use the size-based recommendation).
+    """
     if not audit_done():
         print(f"warning: {DATASET_PATH} not found — run `parse` + `audit` (or `auto`) first.")
         return 1
-    return _llamafactory(["train", config or train_config()], gpus=gpus)
+
+    cfg_path = config or train_config()
+    cfg = _read_yaml(cfg_path)
+    num_gpus = len(gpus.split(",")) if gpus else 1
+    recommended = _advise_epochs(cfg, num_gpus)
+
+    if epochs == "auto":
+        cfg_path = _config_with_epochs(cfg_path, recommended)
+        print(f"[advisor] --epochs auto → training for {recommended} epoch(s).")
+    elif epochs is not None:
+        cfg_path = _config_with_epochs(cfg_path, float(epochs))
+        print(f"[advisor] --epochs {epochs} → overriding config.")
+
+    return _llamafactory(["train", cfg_path], gpus=gpus)
 
 
 def merge(config: Optional[str] = None, gpus: Optional[str] = None) -> int:
